@@ -2,10 +2,15 @@
 set -e
 cd "$(dirname "$0")"
 
-echo "=== 构建用户端前端 (web) ==="
+echo "=== 构建 default 前端 ==="
 cd web
 bun install --frozen-lockfile
 cd default
+DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat ../../VERSION) bun run build
+cd ..
+
+echo "=== 构建 classic 前端 ==="
+cd classic
 DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat ../../VERSION) bun run build
 cd ../..
 
