@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Gift, ExternalLink, Loader2, Receipt, WalletCards } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { SiAlipay } from 'react-icons/si'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -321,8 +322,8 @@ export function RechargeFormCard({
                       const disabled = minTopup > topupAmount
                       const disabledReason = disabled
                         ? t('Minimum topup amount: {{amount}}', {
-                            amount: minTopup,
-                          })
+                          amount: minTopup,
+                        })
                         : undefined
                       const disabledLabel = disabled
                         ? `${t('Minimum:')} ${minTopup}`
@@ -404,8 +405,8 @@ export function RechargeFormCard({
                         const belowMin = waffoMin > topupAmount
                         const disabledReason = belowMin
                           ? t('Minimum topup amount: {{amount}}', {
-                              amount: waffoMin,
-                            })
+                            amount: waffoMin,
+                          })
                           : undefined
                         const disabledLabel = belowMin
                           ? `${t('Minimum:')} ${waffoMin}`
@@ -473,10 +474,21 @@ export function RechargeFormCard({
         </div>
       ) : (
         <Alert>
-          <AlertDescription>
-            {t(
-              'Online topup is not enabled. Please use redemption code or contact administrator.'
-            )}
+          <AlertDescription className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+            <span>
+              {t(
+                'Online topup is not enabled. Please use redemption code or contact administrator.'
+              )}
+            </span>
+            <a
+              href='https://pay.ldxp.cn/shop/XISCRAJ7'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground shrink-0'
+            >
+              <SiAlipay className='h-4 w-4' style={{ color: '#1677FF' }} />
+              {t('链动小铺')}
+            </a>
           </AlertDescription>
         </Alert>
       )}
