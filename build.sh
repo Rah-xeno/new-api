@@ -5,8 +5,9 @@ cd "$(dirname "$0")"
 echo "=== 构建用户端前端 (web) ==="
 cd web
 bun install --frozen-lockfile
-DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat ../VERSION) bun run build
-cd ..
+cd default
+DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat ../../VERSION) bun run build
+cd ../..
 
 echo "=== 交叉编译 Go 后端 (Linux amd64) ==="
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o new-api main.go
