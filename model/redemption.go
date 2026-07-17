@@ -147,6 +147,13 @@ func Redeem(key string, userId int) (quota int, err error) {
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
 		keyCol = `"key"`
 	}
+
+	// Get user group for TopupGroupRatio
+	userGroup, groupErr := GetUserGroup(userId, false)
+	if groupErr != nil {
+		userGroup = "default"
+	}
+	topupRatio := common.GetTopupGroupRatio(userGroup)
 	common.RandomSleep()
 	err = DB.Transaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(keyCol+" = ?", key).First(redemption).Error
@@ -159,6 +166,8 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
 			return errors.New("该兑换码已过期")
 		}
+		// Apply TopupGroupRatio to calculate actual quota
+		actualQuota := common.QuotaRound(float64(redemption.Quota) * topupRatio)
 		// Compare-and-swap on status: only the transaction that flips
 		// enabled -> used may credit quota, so a concurrent redeem of the
 		// same code loses here even without a row lock (e.g. on SQLite).
@@ -175,14 +184,15 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if result.RowsAffected == 0 {
 			return errors.New("该兑换码已被使用")
 		}
-		return tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", redemption.Quota)).Error
+		return tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", actualQuota)).Error
 	})
 	if err != nil {
 		common.SysError("redemption failed: " + err.Error())
 		return 0, ErrRedeemFailed
 	}
-	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
-	return redemption.Quota, nil
+	actualQuota := common.QuotaRound(float64(redemption.Quota) * topupRatio)
+	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(actualQuota), redemption.Id))
+	return actualQuota, nil
 }
 
 func (redemption *Redemption) Insert() error {

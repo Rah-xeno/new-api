@@ -9,11 +9,6 @@ cd default
 DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat ../../VERSION) bun run build
 cd ..
 
-echo "=== 构建 classic 前端 ==="
-cd classic
-DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat ../../VERSION) bun run build
-cd ../..
-
 echo "=== 交叉编译 Go 后端 (Linux amd64) ==="
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o new-api main.go
 
