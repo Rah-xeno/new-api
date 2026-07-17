@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dev"
 	"github.com/QuantumNous/new-api/logger"
 
 	"gorm.io/gorm"
@@ -184,7 +185,15 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if result.RowsAffected == 0 {
 			return errors.New("该兑换码已被使用")
 		}
-		return tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", actualQuota)).Error
+		if err := tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", actualQuota)).Error; err != nil {
+			return err
+		}
+		// Invite reward: grant reward to inviter based on invite plans
+		if _, rewardErr := dev.HandleInviteRewardForRedemption(tx, userId, key, actualQuota); rewardErr != nil {
+			common.SysError("invite reward for redemption failed: " + rewardErr.Error())
+			// Non-fatal: don't roll back the redemption
+		}
+		return nil
 	})
 	if err != nil {
 		common.SysError("redemption failed: " + err.Error())

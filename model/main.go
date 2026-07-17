@@ -11,6 +11,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/dev"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/clickhouse"
@@ -313,6 +314,10 @@ func migrateDB() error {
 		if err := DB.AutoMigrate(&SubscriptionPlan{}); err != nil {
 			return err
 		}
+	}
+	// Dev: Invite Plans
+	if err := dev.AutoMigrateInvitePlans(DB); err != nil {
+		return err
 	}
 	return nil
 }
