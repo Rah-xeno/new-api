@@ -189,7 +189,15 @@ func Redeem(key string, userId int) (quota int, err error) {
 			return err
 		}
 		// Invite reward: grant reward to inviter based on invite plans
-		if _, rewardErr := dev.HandleInviteRewardForRedemption(tx, userId, key, actualQuota); rewardErr != nil {
+		inviterId := 0
+		inviteeName := ""
+		if invitee, userErr := GetUserById(userId, false); userErr == nil {
+			inviterId = invitee.InviterId
+			inviteeName = invitee.Username
+		}
+		if _, rewardErr := dev.HandleInviteRewardForRedemption(tx, userId, inviterId, inviteeName, key, actualQuota, func(uid int, msg string) {
+			RecordLog(uid, LogTypeTopup, msg)
+		}); rewardErr != nil {
 			common.SysError("invite reward for redemption failed: " + rewardErr.Error())
 			// Non-fatal: don't roll back the redemption
 		}
