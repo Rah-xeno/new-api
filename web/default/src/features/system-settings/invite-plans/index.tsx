@@ -47,7 +47,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { formatQuota } from '@/lib/format'
 
@@ -86,7 +86,6 @@ const emptyPlan = (): Partial<InvitePlan> => ({
 
 export function InvitePlansPage() {
     const { t } = useTranslation()
-    const { toast } = useToast()
     const [plans, setPlans] = useState<InvitePlan[]>([])
     const [loading, setLoading] = useState(true)
     const [dialogOpen, setDialogOpen] = useState(false)
@@ -99,11 +98,11 @@ export function InvitePlansPage() {
             const res = await api.get('/api/invite-plan/admin/plans')
             setPlans(res.data?.data || [])
         } catch {
-            toast({ title: t('Failed to load'), variant: 'destructive' })
+            toast.error(t('Failed to load'))
         } finally {
             setLoading(false)
         }
-    }, [t, toast])
+    }, [t])
 
     useEffect(() => {
         loadPlans()
@@ -127,15 +126,15 @@ export function InvitePlansPage() {
                 await api.put(`/api/invite-plan/admin/plans/${editing.id}`, {
                     plan: editing,
                 })
-                toast({ title: t('Updated') })
+                toast.success(t('Updated'))
             } else {
                 await api.post('/api/invite-plan/admin/plans', { plan: editing })
-                toast({ title: t('Created') })
+                toast.success(t('Created'))
             }
             setDialogOpen(false)
             loadPlans()
         } catch {
-            toast({ title: t('Failed to save'), variant: 'destructive' })
+            toast.error(t('Failed to save'))
         } finally {
             setSaving(false)
         }
@@ -145,10 +144,10 @@ export function InvitePlansPage() {
         if (!confirm(t('Delete this plan?'))) return
         try {
             await api.delete(`/api/invite-plan/admin/plans/${id}`)
-            toast({ title: t('Deleted') })
+            toast.success(t('Deleted'))
             loadPlans()
         } catch {
-            toast({ title: t('Failed to delete'), variant: 'destructive' })
+            toast.error(t('Failed to delete'))
         }
     }
 
@@ -157,10 +156,10 @@ export function InvitePlansPage() {
             await api.patch(`/api/invite-plan/admin/plans/${plan.id}`, {
                 enabled: !plan.enabled,
             })
-            toast({ title: plan.enabled ? t('Disabled') : t('Enabled') })
+            toast.success(plan.enabled ? t('Disabled') : t('Enabled'))
             loadPlans()
         } catch {
-            toast({ title: t('Failed'), variant: 'destructive' })
+            toast.error(t('Failed'))
         }
     }
 
