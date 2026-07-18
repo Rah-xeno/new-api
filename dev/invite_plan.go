@@ -1,78 +1,157 @@
 package dev
-package dev
 
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 
 	"gorm.io/gorm"
 )
 
+// --- Trigger / Reward type constants ---
+
+const (
+	InvitePlanTriggerRedemption   = "redemption"
+	InvitePlanTriggerTopup        = "topup"
+	InvitePlanTriggerSubscription = "subscription"
+)
+
+const (
+	InvitePlanRewardQuota        = "quota"
+	InvitePlanRewardSubscription = "subscription"
+)
+
+// --- Models (compatible with old project SQL schema) ---
+
 // InvitePlan represents an invite reward plan configured by admin.
 type InvitePlan struct {
-	Id                     int            `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name                   string         `json:"name" gorm:"type:varchar(255);not null"`
-	Remark                 string         `json:"remark" gorm:"type:varchar(255);default:''"`
-	Enabled                bool           `json:"enabled" gorm:"default:true"`
-	Priority               int            `json:"priority" gorm:"default:0"`
-	TriggerType            string         `json:"trigger_type" gorm:"type:varchar(32);not null;default:'topup'"`
-	TriggerTopupQuota      int            `json:"trigger_topup_quota" gorm:"default:0"`
-	TriggerSubscriptionPlanId int         `json:"trigger_subscription_plan_id" gorm:"default:0"`
-	RewardType             string         `json:"reward_type" gorm:"type:varchar(32);not null;default:'quota'"`
-	RewardPercent          float64        `json:"reward_percent" gorm:"default:0"`
-	RewardMaxQuota         int            `json:"reward_max_quota" gorm:"default:0"`
-	RewardSubscriptionPlanId int          `json:"reward_subscription_plan_id" gorm:"default:0"`
-	MaxInviteesPerInviter  int            `json:"max_invitees_per_inviter" gorm:"default:0"`
-	EffectiveDays          int            `json:"effective_days" gorm:"default:0"`
-	ExpiresAt              int64          `json:"expires_at" gorm:"bigint;default:0"`
-	CreatedAt              int64          `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
-	UpdatedAt              int64          `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
-	DeletedAt              gorm.DeletedAt `json:"-" gorm:"index"`
+	Id int `json:"id"`
+
+	Name    string `json:"name" gorm:"type:varchar(128);not null"`
+	Remark  string `json:"remark" gorm:"type:varchar(255);default:''"`
+	Enabled bool   `json:"enabled" gorm:"default:true;index"`
+
+	Priority int `json:"priority" gorm:"type:int;default:0;index"`
+
+	TriggerType               string `json:"trigger_type" gorm:"type:varchar(16);not null;index"`
+	TriggerTopupQuota         int64  `json:"trigger_topup_quota" gorm:"type:bigint;not null;default:0"`
+	TriggerSubscriptionPlanId int    `json:"trigger_subscription_plan_id" gorm:"type:int;default:0;index"`
+
+	RewardType               string  `json:"reward_type" gorm:"type:varchar(16);not null"`
+	RewardPercent            float64 `json:"reward_percent" gorm:"type:decimal(10,4);not null;default:0"`
+	RewardMaxQuota           int64   `json:"reward_max_quota" gorm:"type:bigint;not null;default:0"`
+	RewardSubscriptionPlanId int     `json:"reward_subscription_plan_id" gorm:"type:int;default:0;index"`
+
+	MaxInviteesPerInviter int   `json:"max_invitees_per_inviter" gorm:"type:int;default:0"`
+	EffectiveDays         int   `json:"effective_days" gorm:"type:int;default:0"`
+	ExpiresAt             int64 `json:"expires_at" gorm:"bigint;index"`
+	CreatedAt             int64 `json:"created_at" gorm:"bigint"`
+	UpdatedAt             int64 `json:"updated_at" gorm:"bigint"`
 }
 
 // InviteRewardRecord logs each invite reward payout.
 type InviteRewardRecord struct {
-	Id              int    `json:"id" gorm:"primaryKey;autoIncrement"`
-	PlanId          int    `json:"plan_id" gorm:"index"`
-	PlanName        string `json:"plan_name" gorm:"type:varchar(255)"`
-	InviterId       int    `json:"inviter_id" gorm:"index"`
-	InviterName     string `json:"inviter_name" gorm:"type:varchar(255)"`
-	InviteeId       int    `json:"invitee_id" gorm:"index"`
-	InviteeName     string `json:"invitee_name" gorm:"type:varchar(255)"`
-	SourceType      string `json:"source_type" gorm:"type:varchar(32)"`   // topup / redemption
-	SourceTradeNo   string `json:"source_trade_no" gorm:"type:varchar(255)"` // redemption key or trade no
-	TriggerQuota    int    `json:"trigger_quota" gorm:"default:0"`         // the quota that triggered this
-	RewardType      string `json:"reward_type" gorm:"type:varchar(32)"`    // quota
-	RewardQuota     int    `json:"reward_quota" gorm:"default:0"`
-	RewardPercent   float64 `json:"reward_percent" gorm:"default:0"`
-	CreatedAt       int64  `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
+	Id int `json:"id"`
+
+	PlanId    int `json:"plan_id" gorm:"index;uniqueIndex:idx_invite_reward_plan_user,priority:1"`
+	InviterId int `json:"inviter_id" gorm:"index;index:idx_invite_reward_plan_inviter,priority:1;uniqueIndex:idx_invite_reward_plan_user,priority:2"`
+	InviteeId int `json:"invitee_id" gorm:"index;uniqueIndex:idx_invite_reward_plan_user,priority:3"`
+
+	SourceType    string `json:"source_type" gorm:"type:varchar(16);not null;uniqueIndex:idx_invite_reward_source,priority:1;index"`
+	SourceTradeNo string `json:"source_trade_no" gorm:"type:varchar(255);not null;uniqueIndex:idx_invite_reward_source,priority:2"`
+
+	TriggerType               string `json:"trigger_type" gorm:"type:varchar(16);not null;index"`
+	TriggerQuota              int64  `json:"trigger_quota" gorm:"type:bigint;not null;default:0"`
+	TriggerSubscriptionPlanId int    `json:"trigger_subscription_plan_id" gorm:"type:int;default:0;index"`
+
+	RewardType               string `json:"reward_type" gorm:"type:varchar(16);not null"`
+	RewardQuota              int64  `json:"reward_quota" gorm:"type:bigint;not null;default:0"`
+	RewardSubscriptionPlanId int    `json:"reward_subscription_plan_id" gorm:"type:int;default:0;index"`
+
+	CreatedAt int64 `json:"created_at" gorm:"bigint;index"`
 }
 
+// --- Sentinel errors ---
+
 var (
-	ErrInvitePlanNotFound     = errors.New("invite plan not found")
-	ErrInvitePlanHasRecords   = errors.New("cannot delete plan with reward records")
-	ErrInvitePlanExpired      = errors.New("invite plan has expired")
+	ErrInvitePlanNotFound   = errors.New("invite plan not found")
+	ErrInvitePlanHasRecords = errors.New("cannot delete plan with reward records")
 )
 
-// DB is the database connection, set by model package during init.
-var DB *gorm.DB
+// --- Normalization helpers ---
 
-// AutoMigrateInvitePlans creates the invite_plans and invite_reward_records tables.
+func NormalizeInvitePlanTriggerType(value string) string {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case InvitePlanTriggerTopup:
+		return InvitePlanTriggerTopup
+	case InvitePlanTriggerSubscription:
+		return InvitePlanTriggerSubscription
+	case InvitePlanTriggerRedemption:
+		return InvitePlanTriggerRedemption
+	default:
+		return ""
+	}
+}
+
+func NormalizeInvitePlanRewardType(value string) string {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case InvitePlanRewardQuota:
+		return InvitePlanRewardQuota
+	case InvitePlanRewardSubscription:
+		return InvitePlanRewardSubscription
+	default:
+		return ""
+	}
+}
+
+// --- GORM hooks ---
+
+func (p *InvitePlan) BeforeCreate(tx *gorm.DB) error {
+	now := common.GetTimestamp()
+	if p.CreatedAt == 0 {
+		p.CreatedAt = now
+	}
+	p.UpdatedAt = now
+	p.TriggerType = NormalizeInvitePlanTriggerType(p.TriggerType)
+	p.RewardType = NormalizeInvitePlanRewardType(p.RewardType)
+	return nil
+}
+
+func (p *InvitePlan) BeforeUpdate(tx *gorm.DB) error {
+	p.UpdatedAt = common.GetTimestamp()
+	p.TriggerType = NormalizeInvitePlanTriggerType(p.TriggerType)
+	p.RewardType = NormalizeInvitePlanRewardType(p.RewardType)
+	return nil
+}
+
+func (r *InviteRewardRecord) BeforeCreate(tx *gorm.DB) error {
+	if r.CreatedAt == 0 {
+		r.CreatedAt = common.GetTimestamp()
+	}
+	r.TriggerType = NormalizeInvitePlanTriggerType(r.TriggerType)
+	r.RewardType = NormalizeInvitePlanRewardType(r.RewardType)
+	r.SourceType = NormalizeInvitePlanTriggerType(r.SourceType)
+	return nil
+}
+
+// --- AutoMigrate ---
+
 func AutoMigrateInvitePlans(db *gorm.DB) error {
 	return db.AutoMigrate(&InvitePlan{}, &InviteRewardRecord{})
 }
 
-// --- InvitePlan CRUD ---
+// --- CRUD ---
 
-func CreateInvitePlan(plan *InvitePlan) error {
-	return DB.Create(plan).Error
+func CreateInvitePlan(db *gorm.DB, plan *InvitePlan) error {
+	return db.Create(plan).Error
 }
 
-func UpdateInvitePlan(id int, updates map[string]interface{}) error {
-	result := DB.Model(&InvitePlan{}).Where("id = ?", id).Updates(updates)
+func UpdateInvitePlan(db *gorm.DB, id int, updates map[string]interface{}) error {
+	result := db.Model(&InvitePlan{}).Where("id = ?", id).Updates(updates)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -82,15 +161,15 @@ func UpdateInvitePlan(id int, updates map[string]interface{}) error {
 	return nil
 }
 
-func DeleteInvitePlan(id int) error {
+func DeleteInvitePlan(db *gorm.DB, id int) error {
 	var count int64
-	if err := DB.Model(&InviteRewardRecord{}).Where("plan_id = ?", id).Count(&count).Error; err != nil {
+	if err := db.Model(&InviteRewardRecord{}).Where("plan_id = ?", id).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
 		return ErrInvitePlanHasRecords
 	}
-	result := DB.Delete(&InvitePlan{}, id)
+	result := db.Delete(&InvitePlan{}, id)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -100,33 +179,22 @@ func DeleteInvitePlan(id int) error {
 	return nil
 }
 
-func GetInvitePlanByID(id int) (*InvitePlan, error) {
-	var plan InvitePlan
-	err := DB.First(&plan, id).Error
-	if err != nil {
-		return nil, err
-	}
-	return &plan, nil
-}
-
-func GetAllInvitePlans() ([]InvitePlan, error) {
+func GetAllInvitePlans(db *gorm.DB) ([]InvitePlan, error) {
 	var plans []InvitePlan
-	err := DB.Order("priority DESC, id ASC").Find(&plans).Error
+	err := db.Order("priority DESC, id ASC").Find(&plans).Error
 	return plans, err
 }
 
-func GetEnabledInvitePlans() ([]InvitePlan, error) {
+func GetEnabledInvitePlans(db *gorm.DB) ([]InvitePlan, error) {
 	var plans []InvitePlan
-	err := DB.Where("enabled = ?", true).Order("priority DESC, id ASC").Find(&plans).Error
+	err := db.Where("enabled = ?", true).Order("priority DESC, id ASC").Find(&plans).Error
 	return plans, err
 }
 
-// --- Reward Records ---
-
-func GetRewardRecords(planId int, page int, pageSize int) ([]InviteRewardRecord, int64, error) {
+func GetRewardRecords(db *gorm.DB, planId int, page int, pageSize int) ([]InviteRewardRecord, int64, error) {
 	var records []InviteRewardRecord
 	var total int64
-	query := model.DB.Model(&InviteRewardRecord{}).Where("plan_id = ?", planId)
+	query := db.Model(&InviteRewardRecord{}).Where("plan_id = ?", planId)
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -136,22 +204,43 @@ func GetRewardRecords(planId int, page int, pageSize int) ([]InviteRewardRecord,
 
 // --- Core Reward Logic ---
 
-// HandleInviteRewardForRedemption checks invite plans and grants rewards
-// when an invitee redeems a code. Should be called inside the redemption DB transaction.
-// inviteeId: the user who redeemed the code
-// inviterId: the user who invited the invitee (0 means no inviter)
-// inviteeName: username of the invitee
-// redemptionKey: the redemption code key
-// redemptionQuota: the quota the invitee received
-// logFunc: optional callback for logging (inviterId, message)
-// Returns the reward quota granted (0 if none).
-func HandleInviteRewardForRedemption(tx *gorm.DB, inviteeId int, inviterId int, inviteeName string, redemptionKey string, redemptionQuota int, logFunc func(int, string)) (rewardQuota int, err error) {
+// HandleInviteRewardForPayment checks invite plans and grants rewards to the
+// inviter when the invitee makes a payment (topup or redemption).
+//
+// Logic:
+//   - Plans are checked in priority DESC order, first match wins.
+//   - A plan matches when: enabled, trigger_type matches sourceType,
+//     trigger_topup_quota <= paymentQuota, plan not expired.
+//   - EffectiveDays: if set (> 0), the invitee must have registered within
+//     the last EffectiveDays days. After that window, no reward is given.
+//   - MaxInviteesPerInviter: if set, caps total reward records for this
+//     (plan, inviter) pair.
+//   - Reward = QuotaRound(paymentQuota * rewardPercent / 100), capped at
+//     RewardMaxQuota.
+//
+// Called inside the payment DB transaction (tx). Returns rewardQuota > 0
+// if a reward was granted.
+func HandleInviteRewardForPayment(
+	tx *gorm.DB,
+	inviteeId int,
+	inviterId int,
+	inviteeName string,
+	inviteeCreatedAt int64,
+	sourceType string,
+	sourceTradeNo string,
+	paymentQuota int,
+	logFunc func(int, string),
+) (rewardQuota int, err error) {
 	if inviterId == 0 {
-		return 0, nil // no inviter
+		return 0, nil
 	}
 
-	// Get enabled plans sorted by priority
-	plans, err := GetEnabledInvitePlans()
+	sourceType = NormalizeInvitePlanTriggerType(sourceType)
+	if sourceType == "" {
+		return 0, nil
+	}
+
+	plans, err := GetEnabledInvitePlans(tx)
 	if err != nil {
 		return 0, fmt.Errorf("get plans: %w", err)
 	}
@@ -159,19 +248,31 @@ func HandleInviteRewardForRedemption(tx *gorm.DB, inviteeId int, inviterId int, 
 	now := common.GetTimestamp()
 
 	for _, plan := range plans {
-		// Skip plans that don't match redemption trigger
-		if plan.TriggerType != "redemption" && plan.TriggerType != "topup" {
+		// Trigger type must match
+		if plan.TriggerType != sourceType {
 			continue
 		}
-		// Check minimum quota threshold
-		if plan.TriggerTopupQuota > 0 && redemptionQuota < plan.TriggerTopupQuota {
+
+		// Min trigger quota check
+		if plan.TriggerTopupQuota > 0 && int64(paymentQuota) < plan.TriggerTopupQuota {
 			continue
 		}
-		// Check expiry
+
+		// Plan expiry check
 		if plan.ExpiresAt > 0 && plan.ExpiresAt < now {
 			continue
 		}
-		// Check max invitees per inviter
+
+		// EffectiveDays: reward only within N days of invitee registration.
+		// 0 means no limit (always reward).
+		if plan.EffectiveDays > 0 && inviteeCreatedAt > 0 {
+			registrationTime := time.Unix(inviteeCreatedAt, 0)
+			if time.Since(registrationTime) > time.Duration(plan.EffectiveDays)*24*time.Hour {
+				continue
+			}
+		}
+
+		// Max invitees per inviter
 		if plan.MaxInviteesPerInviter > 0 {
 			var count int64
 			if err := tx.Model(&InviteRewardRecord{}).
@@ -184,60 +285,50 @@ func HandleInviteRewardForRedemption(tx *gorm.DB, inviteeId int, inviterId int, 
 			}
 		}
 
-		// Calculate reward
 		rewardPercent := plan.RewardPercent
 		if rewardPercent <= 0 {
 			continue
 		}
 
-		baseQuota := float64(redemptionQuota)
-		reward := common.QuotaRound(baseQuota * rewardPercent / 100.0)
-
-		// Apply max cap
-		if plan.RewardMaxQuota > 0 && reward > plan.RewardMaxQuota {
-			reward = plan.RewardMaxQuota
+		reward := common.QuotaRound(float64(paymentQuota) * rewardPercent / 100.0)
+		if plan.RewardMaxQuota > 0 && int64(reward) > plan.RewardMaxQuota {
+			reward = int(plan.RewardMaxQuota)
 		}
 		if reward <= 0 {
 			continue
 		}
 
-		// Grant quota to inviter via raw SQL to avoid model package dependency
+		// Grant quota to inviter
 		if err := tx.Exec("UPDATE users SET quota = quota + ? WHERE id = ?", reward, inviterId).Error; err != nil {
 			return 0, fmt.Errorf("grant quota: %w", err)
 		}
-
-		// Update inviter's AffQuota and AffHistoryQuota
 		if err := tx.Exec("UPDATE users SET aff_quota = aff_quota + ?, aff_history = aff_history + ? WHERE id = ?",
 			reward, reward, inviterId).Error; err != nil {
 			common.SysError(fmt.Sprintf("update inviter aff_quota failed: %v", err))
 		}
 
-		// Record the reward
 		record := &InviteRewardRecord{
 			PlanId:        plan.Id,
-			PlanName:      plan.Name,
 			InviterId:     inviterId,
 			InviteeId:     inviteeId,
-			InviteeName:   inviteeName,
-			SourceType:    "redemption",
-			SourceTradeNo: redemptionKey,
-			TriggerQuota:  redemptionQuota,
-			RewardType:    "quota",
-			RewardQuota:   reward,
-			RewardPercent: rewardPercent,
+			SourceType:    sourceType,
+			SourceTradeNo: sourceTradeNo,
+			TriggerType:   sourceType,
+			TriggerQuota:  int64(paymentQuota),
+			RewardType:    InvitePlanRewardQuota,
+			RewardQuota:   int64(reward),
 			CreatedAt:     now,
 		}
 		if err := tx.Create(record).Error; err != nil {
 			return 0, fmt.Errorf("create reward record: %w", err)
 		}
 
-		// Log
 		if logFunc != nil {
-			logFunc(inviterId, fmt.Sprintf("邀请返利: 邀请人#%d 获得 %d quota (计划:%s, 被邀请人#%d 兑换 %d)",
-				inviterId, reward, plan.Name, inviteeId, redemptionQuota))
+			logFunc(inviterId, fmt.Sprintf("邀请返利到账 %s，活动：%s (被邀请人#%d %s %s)",
+				logger.LogQuota(reward), plan.Name, inviteeId, sourceType, logger.LogQuota(paymentQuota)))
 		}
 
-		return reward, nil // first matching plan wins
+		return reward, nil
 	}
 
 	return 0, nil

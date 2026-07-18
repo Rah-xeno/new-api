@@ -1548,6 +1548,7 @@
     "Edited channels with tag {{tag}}": "Đã chỉnh sửa các kênh có thẻ {{tag}}",
     "Editor mode": "Chế độ trình sửa",
     "Education": "Giáo dục",
+    "Effective Days": "Ngày hiệu lực",
     "Email": "Email",
     "Email (required for verification)": "Email (bắt buộc để xác minh)",
     "Email Address": "Địa chỉ email",
@@ -2354,6 +2355,7 @@
     "Invited Users": "Người dùng được mời",
     "Invitee Reward": "Referral reward",
     "Inviter": "Người mời",
+    "Inviter receives reward only within N days of invitee registration. 0 means no time limit.": "Người mời chỉ nhận thưởng trong N ngày kể từ khi người được mời đăng ký. 0 nghĩa là không giới hạn.",
     "Inviter Reward": "Phần thưởng người mời",
     "Invites": "Mời",
     "Invoke developer-defined functions with structured arguments": "Gọi các hàm do nhà phát triển định nghĩa với đối số có cấu trúc",
@@ -3076,7 +3078,6 @@
     "Online": "Trực tuyến",
     "Online payment is not enabled. Please contact the administrator.": "Thanh toán trực tuyến chưa được kích hoạt. Vui lòng liên hệ quản trị viên.",
     "Online topup is not enabled. Please use redemption code or contact administrator.": "Tính năng nạp tiền trực tuyến chưa được bật. Vui lòng sử dụng mã quy đổi hoặc liên hệ quản trị viên.",
-    "链动小铺": "Cửa hàng Liandong",
     "Only allow specific email domains": "Chỉ cho phép các tên miền email cụ thể",
     "Only available for admins. When enabled, you will receive a summary notification via your selected method when the scheduled model check detects upstream model changes or check failures.": "Chỉ khả dụng cho quản trị viên. Khi bật, bạn sẽ nhận được thông báo tổng hợp qua phương thức đã chọn khi kiểm tra mô hình định kỳ phát hiện thay đổi mô hình nguồn hoặc lỗi kiểm tra.",
     "Only configured combinations are overridden. All other calls keep the billing group base ratio.": "Chỉ các tổ hợp đã cấu hình mới bị ghi đè. Các cuộc gọi khác vẫn dùng hệ số cơ bản của nhóm tính phí.",
@@ -5179,6 +5180,7 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "链动小铺": "Cửa hàng Liandong"
   }
 }

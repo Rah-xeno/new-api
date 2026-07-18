@@ -1548,6 +1548,7 @@
     "Edited channels with tag {{tag}}": "Canaux avec l'étiquette {{tag}} modifiés",
     "Editor mode": "Mode éditeur",
     "Education": "Éducation",
+    "Effective Days": "Jours effectifs",
     "Email": "E-mail",
     "Email (required for verification)": "E-mail (requis pour la vérification)",
     "Email Address": "Adresse e-mail",
@@ -2354,6 +2355,7 @@
     "Invited Users": "Utilisateurs invités",
     "Invitee Reward": "Récompense de l'invité",
     "Inviter": "Inviteur",
+    "Inviter receives reward only within N days of invitee registration. 0 means no time limit.": "Le parrain reçoit une récompense uniquement dans les N jours suivant l'inscription du filleul. 0 signifie aucune limite.",
     "Inviter Reward": "Récompense de l'inviteur",
     "Invites": "Invitations",
     "Invoke developer-defined functions with structured arguments": "Appeler des fonctions définies par le développeur avec des arguments structurés",
@@ -3076,7 +3078,6 @@
     "Online": "En ligne",
     "Online payment is not enabled. Please contact the administrator.": "Le paiement en ligne n'est pas activé. Veuillez contacter l'administrateur.",
     "Online topup is not enabled. Please use redemption code or contact administrator.": "La recharge en ligne n'est pas activée. Veuillez utiliser un code d'échange ou contacter l'administrateur.",
-    "链动小铺": "Boutique Liandong",
     "Only allow specific email domains": "Autoriser uniquement des domaines d'e-mail spécifiques",
     "Only available for admins. When enabled, you will receive a summary notification via your selected method when the scheduled model check detects upstream model changes or check failures.": "Uniquement disponible pour les administrateurs. Lorsque cette option est activée, vous recevrez une notification récapitulative via votre méthode sélectionnée lorsque la vérification planifiée des modèles détecte des changements de modèles en amont ou des échecs de vérification.",
     "Only configured combinations are overridden. All other calls keep the billing group base ratio.": "Seules les combinaisons configurées sont remplacées. Tous les autres appels gardent le taux de base du groupe de facturation.",
@@ -5179,6 +5180,7 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "链动小铺": "Boutique Liandong"
   }
 }

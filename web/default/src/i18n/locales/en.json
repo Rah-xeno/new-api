@@ -1548,6 +1548,7 @@
     "Edited channels with tag {{tag}}": "Edited channels with tag {{tag}}",
     "Editor mode": "Editor mode",
     "Education": "Education",
+    "Effective Days": "Effective Days",
     "Email": "Email",
     "Email (required for verification)": "Email (required for verification)",
     "Email Address": "Email Address",
@@ -2354,6 +2355,7 @@
     "Invited Users": "Invited Users",
     "Invitee Reward": "Invitee Reward",
     "Inviter": "Inviter",
+    "Inviter receives reward only within N days of invitee registration. 0 means no time limit.": "Inviter receives reward only within N days of invitee registration. 0 means no time limit.",
     "Inviter Reward": "Inviter Reward",
     "Invites": "Invites",
     "Invoke developer-defined functions with structured arguments": "Invoke developer-defined functions with structured arguments",
@@ -3076,7 +3078,6 @@
     "Online": "Online",
     "Online payment is not enabled. Please contact the administrator.": "Online payment is not enabled. Please contact the administrator.",
     "Online topup is not enabled. Please use redemption code or contact administrator.": "Online topup is not enabled. Please use redemption code or contact administrator.",
-    "链动小铺": "Liandong Shop",
     "Only allow specific email domains": "Only allow specific email domains",
     "Only available for admins. When enabled, you will receive a summary notification via your selected method when the scheduled model check detects upstream model changes or check failures.": "Only available for admins. When enabled, you will receive a summary notification via your selected method when the scheduled model check detects upstream model changes or check failures.",
     "Only configured combinations are overridden. All other calls keep the billing group base ratio.": "Only configured combinations are overridden. All other calls keep the billing group base ratio.",
@@ -5179,6 +5180,7 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "链动小铺": "Liandong Shop"
   }
 }

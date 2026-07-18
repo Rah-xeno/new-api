@@ -1548,6 +1548,7 @@
     "Edited channels with tag {{tag}}": "Изменены каналы с тегом {{tag}}",
     "Editor mode": "Режим редактора",
     "Education": "Образование",
+    "Effective Days": "Дни действия",
     "Email": "Электронная почта",
     "Email (required for verification)": "Email (требуется для верификации)",
     "Email Address": "Адрес электронной почты",
@@ -2354,6 +2355,7 @@
     "Invited Users": "Приглашенные пользователи",
     "Invitee Reward": "Награда приглашенному",
     "Inviter": "Пригласивший",
+    "Inviter receives reward only within N days of invitee registration. 0 means no time limit.": "Пригласивший получает вознаграждение только в течение N дней после регистрации приглашённого. 0 — без ограничений.",
     "Inviter Reward": "Награда приглашающему",
     "Invites": "Приглашения",
     "Invoke developer-defined functions with structured arguments": "Вызывать заданные разработчиком функции со структурированными аргументами",
@@ -3076,7 +3078,6 @@
     "Online": "Онлайн",
     "Online payment is not enabled. Please contact the administrator.": "Онлайн-оплата не включена. Пожалуйста, свяжитесь с администратором.",
     "Online topup is not enabled. Please use redemption code or contact administrator.": "Онлайн-пополнение не включено. Пожалуйста, используйте код активации или свяжитесь с администратором.",
-    "链动小铺": "Liandong Магазин",
     "Only allow specific email domains": "Разрешить только определенные домены электронной почты",
     "Only available for admins. When enabled, you will receive a summary notification via your selected method when the scheduled model check detects upstream model changes or check failures.": "Доступно только для администраторов. При включении вы будете получать сводное уведомление выбранным способом, когда запланированная проверка моделей обнаружит изменения в вышестоящих моделях или сбои проверки.",
     "Only configured combinations are overridden. All other calls keep the billing group base ratio.": "Переопределяются только настроенные комбинации. Остальные вызовы используют базовый коэффициент тарифной группы.",
@@ -5179,6 +5180,7 @@
     "Zero retention": "Без хранения данных",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "链动小铺": "Liandong Магазин"
   }
 }

@@ -191,7 +191,6 @@ func InitDB() (err error) {
 			db = db.Debug()
 		}
 		DB = db
-		dev.DB = db
 		// MySQL charset/collation startup check: ensure Chinese-capable charset
 		if common.UsingMainDatabase(common.DatabaseTypeMySQL) {
 			if err := checkMySQLChineseSupport(DB); err != nil {

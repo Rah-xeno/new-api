@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dev"
 	"github.com/QuantumNous/new-api/logger"
 
 	"github.com/shopspring/decimal"
@@ -145,6 +146,9 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		if err != nil {
 			return err
 		}
+
+		// Invite reward
+		handleTopUpInviteReward(tx, topUp.UserId, topUp.TradeNo, int(quota))
 
 		return nil
 	})
@@ -375,6 +379,9 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 			return err
 		}
 
+		// Invite reward
+		handleTopUpInviteReward(tx, topUp.UserId, topUp.TradeNo, quotaToAdd)
+
 		userId = topUp.UserId
 		payMoney = topUp.Money
 		paymentMethod = topUp.PaymentMethod
@@ -451,6 +458,9 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			return err
 		}
 
+		// Invite reward
+		handleTopUpInviteReward(tx, topUp.UserId, topUp.TradeNo, int(quota))
+
 		return nil
 	})
 
@@ -511,6 +521,9 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
 			return err
 		}
+
+		// Invite reward
+		handleTopUpInviteReward(tx, topUp.UserId, topUp.TradeNo, quotaToAdd)
 
 		return nil
 	})
@@ -573,6 +586,9 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 			return err
 		}
 
+		// Invite reward
+		handleTopUpInviteReward(tx, topUp.UserId, topUp.TradeNo, quotaToAdd)
+
 		return nil
 	})
 
@@ -586,4 +602,33 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 	}
 
 	return nil
+}
+
+// handleTopUpInviteReward grants invite reward inside the topup DB transaction.
+// It locks the user row, reads inviter info, and calls the shared reward logic.
+// Non-fatal: errors are logged but do not roll back the topup.
+func handleTopUpInviteReward(tx *gorm.DB, userId int, tradeNo string, quotaToAdd int) {
+	// Lock user row to read inviter info
+	var user struct {
+		InviterId int
+		Username  string
+		CreatedAt int64
+	}
+	if err := tx.Raw("SELECT inviter_id, username, created_at FROM users WHERE id = ?", userId).Scan(&user).Error; err != nil {
+		common.SysError("invite reward: failed to read user: " + err.Error())
+		return
+	}
+	if user.InviterId == 0 {
+		return
+	}
+
+	if _, rewardErr := dev.HandleInviteRewardForPayment(
+		tx, userId, user.InviterId, user.Username, user.CreatedAt,
+		dev.InvitePlanTriggerTopup, tradeNo, quotaToAdd,
+		func(uid int, msg string) {
+			RecordLog(uid, LogTypeTopup, msg)
+		},
+	); rewardErr != nil {
+		common.SysError("invite reward for topup failed: " + rewardErr.Error())
+	}
 }

@@ -2,7 +2,6 @@ package router
 
 import (
 	"github.com/QuantumNous/new-api/controller"
-	"github.com/QuantumNous/new-api/dev"
 	"github.com/QuantumNous/new-api/middleware"
 
 	// Import oauth package to register providers via init()
@@ -382,5 +381,14 @@ func SetApiRouter(router *gin.Engine) {
 	}
 
 	// Dev: Invite Plans (admin only)
-\tdev.RegisterInvitePlanRoutes(apiRouter, middleware.AdminAuth())
+\tinvitePlanRoute := apiRouter.Group("/invite-plan/admin")
+\tinvitePlanRoute.Use(middleware.AdminAuth())
+\t{
+\t\tinvitePlanRoute.GET("/plans", controller.GetInvitePlans)
+\t\tinvitePlanRoute.POST("/plans", controller.CreateInvitePlan)
+\t\tinvitePlanRoute.PUT("/plans/:id", controller.UpdateInvitePlan)
+\t\tinvitePlanRoute.PATCH("/plans/:id", controller.UpdateInvitePlan)
+\t\tinvitePlanRoute.DELETE("/plans/:id", controller.DeleteInvitePlan)
+\t\tinvitePlanRoute.GET("/reward-records", controller.GetInviteRewardRecords)
+\t}
 }

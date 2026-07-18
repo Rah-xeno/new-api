@@ -84,7 +84,9 @@ func InitEnv() {
 	// Initialize variables from constants.go that were using environment variables
 	DebugEnabled = os.Getenv("DEBUG") == "true"
 	MemoryCacheEnabled = os.Getenv("MEMORY_CACHE_ENABLED") == "true"
-	IsMasterNode = os.Getenv("NODE_TYPE") != "slave"\tRecordIPLogEnabled = GetEnvOrDefaultBool("RECORD_IP_LOG", false)	initNodeNameIdentity()
+	IsMasterNode = os.Getenv("NODE_TYPE") != "slave"
+	RecordIPLogEnabled = GetEnvOrDefaultBool("RECORD_IP_LOG", false)
+	initNodeNameIdentity()
 	TLSInsecureSkipVerify = GetEnvOrDefaultBool("TLS_INSECURE_SKIP_VERIFY", false)
 	if TLSInsecureSkipVerify {
 		if tr, ok := http.DefaultTransport.(*http.Transport); ok && tr != nil {
