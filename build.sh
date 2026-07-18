@@ -10,7 +10,8 @@ DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat ../../VERSION) bun run
 cd ..
 
 echo "=== 交叉编译 Go 后端 (Linux amd64) ==="
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o new-api main.go
+cd ..
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o new-api
 
 echo ""
 echo "=== 构建完成 ==="
