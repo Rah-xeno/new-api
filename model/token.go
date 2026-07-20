@@ -78,6 +78,24 @@ func (token *Token) GetIpLimits() []string {
 	return ipLimits
 }
 
+// GetFirstGroup supports legacy multi-group tokens while keeping the current
+// single-group behavior. Legacy multi-group values are JSON string arrays.
+func (token *Token) GetFirstGroup() string {
+	group := strings.TrimSpace(token.Group)
+	if !strings.HasPrefix(group, "[") {
+		return group
+	}
+
+	var groups []string
+	if err := common.UnmarshalJsonStr(group, &groups); err != nil {
+		return group
+	}
+	if len(groups) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(groups[0])
+}
+
 func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
 	var tokens []*Token
 	var err error

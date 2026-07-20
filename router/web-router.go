@@ -20,7 +20,7 @@ type ThemeAssets struct {
 }
 
 func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
-	webFS := common.EmbedFolder(assets.BuildFS, "web/classic/dist")
+	webFS := common.EmbedFolder(assets.BuildFS, "web/default/dist")
 
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 	router.Use(middleware.GlobalWebRateLimit())
