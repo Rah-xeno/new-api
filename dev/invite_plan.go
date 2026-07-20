@@ -57,9 +57,9 @@ type InvitePlan struct {
 type InviteRewardRecord struct {
 	Id int `json:"id"`
 
-	PlanId    int `json:"plan_id" gorm:"index;uniqueIndex:idx_invite_reward_plan_user,priority:1"`
-	InviterId int `json:"inviter_id" gorm:"index;index:idx_invite_reward_plan_inviter,priority:1;uniqueIndex:idx_invite_reward_plan_user,priority:2"`
-	InviteeId int `json:"invitee_id" gorm:"index;uniqueIndex:idx_invite_reward_plan_user,priority:3"`
+	PlanId    int `json:"plan_id" gorm:"index;index:idx_invite_reward_plan_inviter_invitee,priority:1"`
+	InviterId int `json:"inviter_id" gorm:"index;index:idx_invite_reward_plan_inviter,priority:1;index:idx_invite_reward_plan_inviter_invitee,priority:2"`
+	InviteeId int `json:"invitee_id" gorm:"index;index:idx_invite_reward_plan_inviter_invitee,priority:3"`
 
 	SourceType    string `json:"source_type" gorm:"type:varchar(16);not null;uniqueIndex:idx_invite_reward_source,priority:1;index"`
 	SourceTradeNo string `json:"source_trade_no" gorm:"type:varchar(255);not null;uniqueIndex:idx_invite_reward_source,priority:2"`
@@ -141,7 +141,18 @@ func (r *InviteRewardRecord) BeforeCreate(tx *gorm.DB) error {
 // --- AutoMigrate ---
 
 func AutoMigrateInvitePlans(db *gorm.DB) error {
+	if err := migrateInviteRewardRepeatIndex(db); err != nil {
+		return err
+	}
 	return db.AutoMigrate(&InvitePlan{}, &InviteRewardRecord{})
+}
+
+func migrateInviteRewardRepeatIndex(db *gorm.DB) error {
+	const legacyUniqueIndex = "idx_invite_reward_plan_user"
+	if db.Migrator().HasTable(&InviteRewardRecord{}) && db.Migrator().HasIndex(&InviteRewardRecord{}, legacyUniqueIndex) {
+		return db.Migrator().DropIndex(&InviteRewardRecord{}, legacyUniqueIndex)
+	}
+	return nil
 }
 
 // --- CRUD ---
