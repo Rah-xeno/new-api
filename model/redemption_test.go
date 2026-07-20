@@ -50,6 +50,20 @@ func TestSearchRedemptionsFiltersAndPaginates(t *testing.T) {
 			wantIds:   []int{3, 2, 1},
 		},
 		{
+			name:      "keyword matches an exact redemption code",
+			keyword:   "00000000000000000000000000000004",
+			num:       10,
+			wantTotal: 1,
+			wantIds:   []int{4},
+		},
+		{
+			name:      "partial redemption code does not match",
+			keyword:   "0000000000000000000000000000000",
+			num:       10,
+			wantTotal: 0,
+			wantIds:   []int{},
+		},
+		{
 			name:      "enabled status excludes expired rows",
 			status:    "1",
 			num:       10,
