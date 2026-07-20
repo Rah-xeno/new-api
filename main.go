@@ -40,10 +40,10 @@ import (
 	_ "net/http/pprof"
 )
 
-//go:embed web/default/dist
+//go:embed web/classic/dist
 var buildFS embed.FS
 
-//go:embed web/default/dist/index.html
+//go:embed web/classic/dist/index.html
 var indexPage []byte
 
 func main() {
@@ -198,8 +198,8 @@ func main() {
 
 	// 设置路由
 	router.SetRouter(server, router.ThemeAssets{
-		DefaultBuildFS:   buildFS,
-		DefaultIndexPage: indexPage,
+		BuildFS:   buildFS,
+		IndexPage: indexPage,
 	})
 	var port = os.Getenv("PORT")
 	if port == "" {

@@ -15,17 +15,17 @@ import (
 
 // ThemeAssets holds the embedded frontend assets.
 type ThemeAssets struct {
-	DefaultBuildFS   embed.FS
-	DefaultIndexPage []byte
+	BuildFS   embed.FS
+	IndexPage []byte
 }
 
 func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
-	defaultFS := common.EmbedFolder(assets.DefaultBuildFS, "web/default/dist")
+	webFS := common.EmbedFolder(assets.BuildFS, "web/classic/dist")
 
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 	router.Use(middleware.GlobalWebRateLimit())
 	router.Use(middleware.Cache())
-	router.Use(static.Serve("/", defaultFS))
+	router.Use(static.Serve("/", webFS))
 	router.NoRoute(func(c *gin.Context) {
 		c.Set(middleware.RouteTagKey, "web")
 		if strings.HasPrefix(c.Request.RequestURI, "/v1") || strings.HasPrefix(c.Request.RequestURI, "/api") || strings.HasPrefix(c.Request.RequestURI, "/assets") {
@@ -33,6 +33,6 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 			return
 		}
 		c.Header("Cache-Control", "no-cache")
-		c.Data(http.StatusOK, "text/html; charset=utf-8", assets.DefaultIndexPage)
+		c.Data(http.StatusOK, "text/html; charset=utf-8", assets.IndexPage)
 	})
 }
