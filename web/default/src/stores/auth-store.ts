@@ -42,6 +42,15 @@ export interface AuthUser {
   aff_quota?: number
   aff_history_quota?: number
   inviter_id?: number
+  referral_mode?: string
+  agent_enabled?: boolean
+  agent_portal_visible?: boolean
+  agent_use_default_rates?: boolean
+  agent_first_topup_rate?: number
+  agent_repeat_topup_rate?: number
+  agent_commission_balance?: number
+  agent_commission_total?: number
+  agent_commission_withdrawn?: number
   github_id?: string
   oidc_id?: string
   wechat_id?: string

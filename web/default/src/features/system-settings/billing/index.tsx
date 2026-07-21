@@ -105,6 +105,8 @@ const defaultBillingSettings: BillingSettings = {
   'checkin_setting.enabled': false,
   'checkin_setting.min_quota': 1000,
   'checkin_setting.max_quota': 10000,
+  'agent_distribution_setting.default_first_topup_rate': 0,
+  'agent_distribution_setting.default_repeat_topup_rate': 0,
 }
 
 export function BillingSettings() {

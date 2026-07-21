@@ -23,6 +23,7 @@ import { Route as ConsoleTopupRouteImport } from './routes/console/topup'
 import { Route as ConsoleLogRouteImport } from './routes/console/log'
 import { Route as AuthenticatedInviteRouteImport } from './routes/_authenticated/invite'
 import { Route as AuthenticatedChat2linkRouteImport } from './routes/_authenticated/chat2link'
+import { Route as AuthenticatedAgentDistributionRouteImport } from './routes/_authenticated/agent-distribution'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
@@ -140,6 +141,12 @@ const AuthenticatedChat2linkRoute = AuthenticatedChat2linkRouteImport.update({
   path: '/chat2link',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAgentDistributionRoute =
+  AuthenticatedAgentDistributionRouteImport.update({
+    id: '/agent-distribution',
+    path: '/agent-distribution',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const errors503Route = errors503RouteImport.update({
   id: '/(errors)/503',
   path: '/503',
@@ -429,6 +436,7 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/agent-distribution': typeof AuthenticatedAgentDistributionRoute
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/invite': typeof AuthenticatedInviteRoute
   '/console/log': typeof ConsoleLogRoute
@@ -490,6 +498,7 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/agent-distribution': typeof AuthenticatedAgentDistributionRoute
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/invite': typeof AuthenticatedInviteRoute
   '/console/log': typeof ConsoleLogRoute
@@ -555,6 +564,7 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
+  '/_authenticated/agent-distribution': typeof AuthenticatedAgentDistributionRoute
   '/_authenticated/chat2link': typeof AuthenticatedChat2linkRoute
   '/_authenticated/invite': typeof AuthenticatedInviteRoute
   '/console/log': typeof ConsoleLogRoute
@@ -619,6 +629,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/agent-distribution'
     | '/chat2link'
     | '/invite'
     | '/console/log'
@@ -680,6 +691,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/agent-distribution'
     | '/chat2link'
     | '/invite'
     | '/console/log'
@@ -744,6 +756,7 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
+    | '/_authenticated/agent-distribution'
     | '/_authenticated/chat2link'
     | '/_authenticated/invite'
     | '/console/log'
@@ -909,6 +922,13 @@ declare module '@tanstack/react-router' {
       path: '/chat2link'
       fullPath: '/chat2link'
       preLoaderRoute: typeof AuthenticatedChat2linkRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/agent-distribution': {
+      id: '/_authenticated/agent-distribution'
+      path: '/agent-distribution'
+      fullPath: '/agent-distribution'
+      preLoaderRoute: typeof AuthenticatedAgentDistributionRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/(errors)/503': {
@@ -1338,6 +1358,7 @@ const AuthenticatedSystemSettingsRouteRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSystemSettingsRouteRoute: typeof AuthenticatedSystemSettingsRouteRouteWithChildren
+  AuthenticatedAgentDistributionRoute: typeof AuthenticatedAgentDistributionRoute
   AuthenticatedChat2linkRoute: typeof AuthenticatedChat2linkRoute
   AuthenticatedInviteRoute: typeof AuthenticatedInviteRoute
   AuthenticatedChatChatIdRoute: typeof AuthenticatedChatChatIdRoute
@@ -1362,6 +1383,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSystemSettingsRouteRoute:
     AuthenticatedSystemSettingsRouteRouteWithChildren,
+  AuthenticatedAgentDistributionRoute: AuthenticatedAgentDistributionRoute,
   AuthenticatedChat2linkRoute: AuthenticatedChat2linkRoute,
   AuthenticatedInviteRoute: AuthenticatedInviteRoute,
   AuthenticatedChatChatIdRoute: AuthenticatedChatChatIdRoute,

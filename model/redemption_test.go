@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -192,4 +193,48 @@ func TestRedeemConcurrentSingleSuccess(t *testing.T) {
 	var user User
 	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
 	assert.Equal(t, 300, user.Quota, "quota must be credited exactly once")
+}
+
+func TestRedeemStillSucceedsWhenAgentCommissionFails(t *testing.T) {
+	const redemptionQuota = 5_000_000
+	userId, key := setupRedeemFixture(t, redemptionQuota)
+
+	agent := &User{
+		Username:             "redeem-agent",
+		AffCode:              "redeem-agent-code",
+		Password:             "password",
+		Status:               common.UserStatusEnabled,
+		AgentEnabled:         true,
+		AgentUseDefaultRates: false,
+		AgentFirstTopupRate:  10,
+		AgentRepeatTopupRate: 5,
+	}
+	require.NoError(t, DB.Create(agent).Error)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", userId).Updates(map[string]interface{}{
+		"inviter_id":    agent.Id,
+		"referral_mode": ReferralModeAgentDistribution,
+	}).Error)
+
+	// A failing trigger simulates a commission-only database error.
+	// The nested savepoint must isolate it so the redemption itself can commit.
+	require.NoError(t, DB.Exec(`
+		CREATE TRIGGER fail_agent_commission
+		BEFORE UPDATE OF agent_commission_balance ON users
+		WHEN NEW.id = `+fmt.Sprint(agent.Id)+`
+		BEGIN
+			SELECT RAISE(ABORT, 'forced commission failure');
+		END
+	`).Error)
+	t.Cleanup(func() {
+		require.NoError(t, DB.Exec("DROP TRIGGER IF EXISTS fail_agent_commission").Error)
+	})
+
+	quota, err := Redeem(key, userId)
+	require.NoError(t, err)
+	assert.Equal(t, redemptionQuota, quota)
+
+	var user User
+	require.NoError(t, DB.First(&user, userId).Error)
+	assert.Equal(t, redemptionQuota, user.Quota)
+	assert.Zero(t, user.FirstPaymentAt, "failed commission work should be rolled back to its savepoint")
 }

@@ -608,17 +608,26 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 // It locks the user row, reads inviter info, and calls the shared reward logic.
 // Non-fatal: errors are logged but do not roll back the topup.
 func handleTopUpInviteReward(tx *gorm.DB, userId int, tradeNo string, quotaToAdd int) {
-	// Lock user row to read inviter info
-	var user struct {
-		InviterId int
-		Username  string
-		CreatedAt int64
-	}
-	if err := tx.Raw("SELECT inviter_id, username, created_at FROM users WHERE id = ?", userId).Scan(&user).Error; err != nil {
+	var user User
+	if err := lockForUpdate(tx).Select("id", "inviter_id", "username", "created_at", "referral_mode").Where("id = ?", userId).First(&user).Error; err != nil {
 		common.SysError("invite reward: failed to read user: " + err.Error())
 		return
 	}
 	if user.InviterId == 0 {
+		return
+	}
+	if NormalizeReferralMode(user.ReferralMode) == ReferralModeAgentDistribution {
+		var topUp TopUp
+		if err := tx.Where("trade_no = ?", tradeNo).First(&topUp).Error; err != nil {
+			common.SysError("agent commission: failed to read topup: " + err.Error())
+			return
+		}
+		if err := tx.Transaction(func(commissionTx *gorm.DB) error {
+			_, commissionErr := HandleAgentCommissionForTopUpTx(commissionTx, &topUp)
+			return commissionErr
+		}); err != nil {
+			common.SysError("agent commission for topup failed: " + err.Error())
+		}
 		return
 	}
 

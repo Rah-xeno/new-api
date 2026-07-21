@@ -94,6 +94,10 @@ const EditUserModal = (props) => {
     quota_amount: 0,
     group: 'default',
     remark: '',
+    agent_enabled: false,
+    agent_use_default_rates: true,
+    agent_first_topup_rate: 0,
+    agent_repeat_topup_rate: 0,
   });
 
   const fetchGroups = async () => {
@@ -170,7 +174,11 @@ const EditUserModal = (props) => {
   const adjustQuota = async () => {
     const quotaVal = parseInt(adjustQuotaLocal) || 0;
     if (quotaVal <= 0 && adjustMode !== 'override') return;
-    if (adjustMode === 'override' && (adjustQuotaLocal === '' || adjustQuotaLocal == null)) return;
+    if (
+      adjustMode === 'override' &&
+      (adjustQuotaLocal === '' || adjustQuotaLocal == null)
+    )
+      return;
     setAdjustLoading(true);
     try {
       const res = await API.post('/api/user/manage', {
@@ -401,7 +409,10 @@ const EditUserModal = (props) => {
                             ? `▾ ${t('收起原生额度输入')}`
                             : `▸ ${t('使用原生额度输入')}`}
                         </div>
-                        <div style={{ display: showQuotaInput ? 'block' : 'none' }} className='mt-2'>
+                        <div
+                          style={{ display: showQuotaInput ? 'block' : 'none' }}
+                          className='mt-2'
+                        >
                           <Form.InputNumber
                             field='quota'
                             label={t('额度')}
@@ -411,6 +422,68 @@ const EditUserModal = (props) => {
                           />
                         </div>
                       </Col>
+                    </Row>
+                  </Card>
+                )}
+
+                {userId && (
+                  <Card className='!rounded-2xl shadow-sm border-0'>
+                    <div className='flex items-center mb-2'>
+                      <Avatar
+                        size='small'
+                        color='orange'
+                        className='mr-2 shadow-md'
+                      >
+                        <IconUserGroup size={16} />
+                      </Avatar>
+                      <div>
+                        <Text className='text-lg font-medium'>
+                          {t('代理分销')}
+                        </Text>
+                        <div className='text-xs text-gray-600'>
+                          {t('设置代理资格以及首充、复充分成比例')}
+                        </div>
+                      </div>
+                    </div>
+                    <Row gutter={12}>
+                      <Col span={12}>
+                        <Form.Switch
+                          field='agent_enabled'
+                          label={t('启用代理')}
+                        />
+                      </Col>
+                      <Col span={12}>
+                        <Form.Switch
+                          field='agent_use_default_rates'
+                          label={t('使用系统默认比例')}
+                        />
+                      </Col>
+                      {!values.agent_use_default_rates && (
+                        <>
+                          <Col span={12}>
+                            <Form.InputNumber
+                              field='agent_first_topup_rate'
+                              label={t('首充分成比例')}
+                              min={0}
+                              max={100}
+                              precision={2}
+                              suffix='%'
+                              style={{ width: '100%' }}
+                            />
+                          </Col>
+                          <Col span={12}>
+                            <Form.InputNumber
+                              field='agent_repeat_topup_rate'
+                              label={t('复充分成比例')}
+                              min={0}
+                              max={100}
+                              precision={2}
+                              suffix='%'
+                              style={{ width: '100%' }}
+                            />
+                          </Col>
+                        </>
+                      )}
                     </Row>
                   </Card>
                 )}
@@ -539,7 +612,10 @@ const EditUserModal = (props) => {
             ? `▾ ${t('收起原生额度输入')}`
             : `▸ ${t('使用原生额度输入')}`}
         </div>
-        <div style={{ display: showAdjustQuotaRaw ? 'block' : 'none' }} className='mt-2'>
+        <div
+          style={{ display: showAdjustQuotaRaw ? 'block' : 'none' }}
+          className='mt-2'
+        >
           <div className='mb-1'>
             <Text size='small'>{t('额度')}</Text>
           </div>

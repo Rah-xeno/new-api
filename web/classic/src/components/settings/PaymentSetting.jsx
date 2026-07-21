@@ -24,6 +24,7 @@ import SettingsPaymentGateway from '../../pages/Setting/Payment/SettingsPaymentG
 import SettingsPaymentGatewayStripe from '../../pages/Setting/Payment/SettingsPaymentGatewayStripe';
 import SettingsPaymentGatewayCreem from '../../pages/Setting/Payment/SettingsPaymentGatewayCreem';
 import SettingsPaymentGatewayWaffo from '../../pages/Setting/Payment/SettingsPaymentGatewayWaffo';
+import SettingsAgentDistribution from '../../pages/Setting/Payment/SettingsAgentDistribution';
 import { API, showError, showSuccess, toBoolean } from '../../helpers';
 import { useTranslation } from 'react-i18next';
 import RiskAcknowledgementModal from '../common/modals/RiskAcknowledgementModal';
@@ -44,6 +45,8 @@ const PaymentSetting = () => {
     PayMethods: '',
     AmountOptions: '',
     AmountDiscount: '',
+    'agent_distribution_setting.default_first_topup_rate': 0,
+    'agent_distribution_setting.default_repeat_topup_rate': 0,
 
     StripeApiSecret: '',
     StripeWebhookSecret: '',
@@ -160,6 +163,8 @@ const PaymentSetting = () => {
           case 'MinTopUp':
           case 'StripeUnitPrice':
           case 'StripeMinTopUp':
+          case 'agent_distribution_setting.default_first_topup_rate':
+          case 'agent_distribution_setting.default_repeat_topup_rate':
             newInputs[item.key] = parseFloat(item.value);
             break;
           default:
@@ -301,6 +306,12 @@ const PaymentSetting = () => {
                   options={inputs}
                   refresh={onRefresh}
                   hideSectionTitle
+                />
+              </Tabs.TabPane>
+              <Tabs.TabPane tab={t('代理分销')} itemKey='agent-distribution'>
+                <SettingsAgentDistribution
+                  options={inputs}
+                  refresh={onRefresh}
                 />
               </Tabs.TabPane>
             </Tabs>

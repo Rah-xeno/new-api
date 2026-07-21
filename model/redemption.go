@@ -8,7 +8,9 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dev"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -143,6 +145,7 @@ func Redeem(key string, userId int) (quota int, err error) {
 		return 0, errors.New("无效的 user id")
 	}
 	redemption := &Redemption{}
+	var agentCommissionOutcome *AgentCommissionOutcome
 
 	keyCol := "`key`"
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
@@ -192,10 +195,27 @@ func Redeem(key string, userId int) (quota int, err error) {
 		inviterId := 0
 		inviteeName := ""
 		var inviteeCreatedAt int64
-		if invitee, userErr := GetUserById(userId, false); userErr == nil {
+		var invitee User
+		if userErr := lockForUpdate(tx).Where("id = ?", userId).First(&invitee).Error; userErr == nil {
 			inviterId = invitee.InviterId
 			inviteeName = invitee.Username
 			inviteeCreatedAt = invitee.CreatedAt
+			if NormalizeReferralMode(invitee.ReferralMode) == ReferralModeAgentDistribution {
+				sourceAmountCents := int64(0)
+				if common.QuotaPerUnit > 0 && operation_setting.Price > 0 {
+					sourceAmountCents = decimal.NewFromInt(int64(actualQuota)).Div(decimal.NewFromFloat(common.QuotaPerUnit)).Mul(decimal.NewFromFloat(operation_setting.Price)).Mul(decimal.NewFromInt(100)).Round(0).IntPart()
+				}
+				userErr = tx.Transaction(func(commissionTx *gorm.DB) error {
+					var commissionErr error
+					agentCommissionOutcome, commissionErr = HandleAgentCommissionForRedemptionTx(commissionTx, userId, key, sourceAmountCents)
+					return commissionErr
+				})
+				if userErr != nil {
+					agentCommissionOutcome = nil
+					common.SysError("agent commission for redemption failed: " + userErr.Error())
+				}
+				return nil
+			}
 		}
 		if _, rewardErr := dev.HandleInviteRewardForPayment(tx, userId, inviterId, inviteeName, inviteeCreatedAt, dev.InvitePlanTriggerRedemption, key, actualQuota, func(uid int, msg string) {
 			RecordLog(uid, LogTypeTopup, msg)
@@ -209,6 +229,7 @@ func Redeem(key string, userId int) (quota int, err error) {
 		common.SysError("redemption failed: " + err.Error())
 		return 0, ErrRedeemFailed
 	}
+	ApplyAgentCommissionSideEffects(agentCommissionOutcome)
 	actualQuota := common.QuotaRound(float64(redemption.Quota) * topupRatio)
 	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(actualQuota), redemption.Id))
 	return actualQuota, nil

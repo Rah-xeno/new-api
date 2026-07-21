@@ -271,10 +271,24 @@ func migrateDB() error {
 		return err
 	}
 
+	if skip, err := shouldSkipLegacyAgentSQLiteAutoMigrate("users"); err != nil {
+		return err
+	} else if !skip {
+		if err := DB.AutoMigrate(&User{}); err != nil {
+			return err
+		}
+	}
+	if skip, err := shouldSkipLegacyAgentSQLiteAutoMigrate("agent_commission_records"); err != nil {
+		return err
+	} else if !skip {
+		if err := DB.AutoMigrate(&AgentCommissionRecord{}); err != nil {
+			return err
+		}
+	}
+
 	err := DB.AutoMigrate(
 		&Channel{},
 		&Token{},
-		&User{},
 		&PasskeyCredential{},
 		&Option{},
 		&Redemption{},
@@ -306,6 +320,9 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
+	if err := normalizeAgentDistributionUsers(); err != nil {
+		return err
+	}
 	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
 		if err := ensureSubscriptionPlanTableSQLite(); err != nil {
 			return err
@@ -332,7 +349,6 @@ func migrateDBFast() error {
 	}{
 		{&Channel{}, "Channel"},
 		{&Token{}, "Token"},
-		{&User{}, "User"},
 		{&PasskeyCredential{}, "PasskeyCredential"},
 		{&Option{}, "Option"},
 		{&Redemption{}, "Redemption"},
@@ -359,6 +375,22 @@ func migrateDBFast() error {
 		{&SystemTask{}, "SystemTask"},
 		{&SystemTaskLock{}, "SystemTaskLock"},
 	}
+	if skip, err := shouldSkipLegacyAgentSQLiteAutoMigrate("users"); err != nil {
+		return err
+	} else if !skip {
+		migrations = append(migrations, struct {
+			model interface{}
+			name  string
+		}{&User{}, "User"})
+	}
+	if skip, err := shouldSkipLegacyAgentSQLiteAutoMigrate("agent_commission_records"); err != nil {
+		return err
+	} else if !skip {
+		migrations = append(migrations, struct {
+			model interface{}
+			name  string
+		}{&AgentCommissionRecord{}, "AgentCommissionRecord"})
+	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
 	errChan := make(chan error, len(migrations))
 
@@ -382,6 +414,9 @@ func migrateDBFast() error {
 			return err
 		}
 	}
+	if err := normalizeAgentDistributionUsers(); err != nil {
+		return err
+	}
 	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
 		if err := ensureSubscriptionPlanTableSQLite(); err != nil {
 			return err
@@ -393,6 +428,25 @@ func migrateDBFast() error {
 	}
 	common.SysLog("database migrated")
 	return nil
+}
+
+// shouldSkipLegacyAgentSQLiteAutoMigrate detects tables created by the old
+// project with DECIMAL(10,4) agent-rate columns. The glebarez SQLite migrator
+// cannot re-parse SQLite DDL containing the comma in that type declaration.
+// Those old tables already have the exact columns used here, so leaving them
+// in place preserves their schema and data; newly created SQLite databases use
+// AgentRate's comma-free DECIMAL declaration and continue through AutoMigrate.
+func shouldSkipLegacyAgentSQLiteAutoMigrate(tableName string) (bool, error) {
+	if !common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+		return false, nil
+	}
+	var createSQL string
+	result := DB.Raw("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", tableName).Scan(&createSQL)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	compactSQL := strings.NewReplacer(" ", "", "\n", "", "\r", "", "\t", "").Replace(strings.ToLower(createSQL))
+	return strings.Contains(compactSQL, "decimal(10,4)"), nil
 }
 
 func migrateLOGDB() error {

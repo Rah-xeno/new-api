@@ -55,6 +55,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const About = lazy(() => import('./pages/About'));
 const UserAgreement = lazy(() => import('./pages/UserAgreement'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const AgentDistributionPage = lazy(() => import('./pages/AgentDistribution'));
 
 function DynamicOAuth2Callback() {
   const { provider } = useParams();
@@ -107,6 +108,14 @@ function App() {
           }
         />
         <Route path='/forbidden' element={<Forbidden />} />
+        <Route
+          path='/console/distribution'
+          element={
+            <PrivateRoute>
+              <AgentDistributionPage />
+            </PrivateRoute>
+          }
+        />
         <Route
           path='/console/models'
           element={

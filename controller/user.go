@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -486,31 +487,40 @@ func GetSelf(c *gin.Context) {
 
 	// 构建响应数据，包含用户信息和权限
 	responseData := map[string]interface{}{
-		"id":                user.Id,
-		"username":          user.Username,
-		"display_name":      user.DisplayName,
-		"role":              user.Role,
-		"status":            user.Status,
-		"email":             user.Email,
-		"github_id":         user.GitHubId,
-		"discord_id":        user.DiscordId,
-		"oidc_id":           user.OidcId,
-		"wechat_id":         user.WeChatId,
-		"telegram_id":       user.TelegramId,
-		"group":             user.Group,
-		"quota":             user.Quota,
-		"used_quota":        user.UsedQuota,
-		"request_count":     user.RequestCount,
-		"aff_code":          user.AffCode,
-		"aff_count":         user.AffCount,
-		"aff_quota":         user.AffQuota,
-		"aff_history_quota": user.AffHistoryQuota,
-		"inviter_id":        user.InviterId,
-		"linux_do_id":       user.LinuxDOId,
-		"setting":           user.Setting,
-		"stripe_customer":   user.StripeCustomer,
-		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
-		"permissions":       permissions,                // 新增权限字段
+		"id":                         user.Id,
+		"username":                   user.Username,
+		"display_name":               user.DisplayName,
+		"role":                       user.Role,
+		"status":                     user.Status,
+		"email":                      user.Email,
+		"github_id":                  user.GitHubId,
+		"discord_id":                 user.DiscordId,
+		"oidc_id":                    user.OidcId,
+		"wechat_id":                  user.WeChatId,
+		"telegram_id":                user.TelegramId,
+		"group":                      user.Group,
+		"quota":                      user.Quota,
+		"used_quota":                 user.UsedQuota,
+		"request_count":              user.RequestCount,
+		"aff_code":                   user.AffCode,
+		"aff_count":                  user.AffCount,
+		"aff_quota":                  user.AffQuota,
+		"aff_history_quota":          user.AffHistoryQuota,
+		"inviter_id":                 user.InviterId,
+		"referral_mode":              user.ReferralMode,
+		"agent_enabled":              user.AgentEnabled,
+		"agent_use_default_rates":    user.AgentUseDefaultRates,
+		"agent_first_topup_rate":     user.AgentFirstTopupRate,
+		"agent_repeat_topup_rate":    user.AgentRepeatTopupRate,
+		"agent_commission_balance":   user.AgentCommissionBalance,
+		"agent_commission_total":     user.AgentCommissionTotal,
+		"agent_commission_withdrawn": user.AgentCommissionWithdrawn,
+		"agent_portal_visible":       model.IsAgentPortalVisible(user),
+		"linux_do_id":                user.LinuxDOId,
+		"setting":                    user.Setting,
+		"stripe_customer":            user.StripeCustomer,
+		"sidebar_modules":            userSetting.SidebarModules, // 正确提取sidebar_modules字段
+		"permissions":                permissions,                // 新增权限字段
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -658,8 +668,18 @@ func GetUserModels(c *gin.Context) {
 }
 
 func UpdateUser(c *gin.Context) {
+	requestBody, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	var requestFields map[string]json.RawMessage
+	if err := common.Unmarshal(requestBody, &requestFields); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
 	var updatedUser model.User
-	err := json.NewDecoder(c.Request.Body).Decode(&updatedUser)
+	err = common.Unmarshal(requestBody, &updatedUser)
 	if err != nil || updatedUser.Id == 0 {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
@@ -679,6 +699,22 @@ func UpdateUser(c *gin.Context) {
 	originUser, err := model.GetUserById(updatedUser.Id, false)
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if _, ok := requestFields["agent_enabled"]; !ok {
+		updatedUser.AgentEnabled = originUser.AgentEnabled
+	}
+	if _, ok := requestFields["agent_use_default_rates"]; !ok {
+		updatedUser.AgentUseDefaultRates = originUser.AgentUseDefaultRates
+	}
+	if _, ok := requestFields["agent_first_topup_rate"]; !ok {
+		updatedUser.AgentFirstTopupRate = originUser.AgentFirstTopupRate
+	}
+	if _, ok := requestFields["agent_repeat_topup_rate"]; !ok {
+		updatedUser.AgentRepeatTopupRate = originUser.AgentRepeatTopupRate
+	}
+	if updatedUser.AgentFirstTopupRate < 0 || updatedUser.AgentFirstTopupRate > 100 || updatedUser.AgentRepeatTopupRate < 0 || updatedUser.AgentRepeatTopupRate > 100 {
+		common.ApiErrorMsg(c, "代理分销比例必须在 0 到 100 之间")
 		return
 	}
 	if updatedUser.Role != common.RoleGuestUser && updatedUser.Role != originUser.Role {

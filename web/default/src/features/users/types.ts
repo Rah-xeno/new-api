@@ -51,6 +51,14 @@ export const userSchema = z.object({
   aff_quota: z.number().optional(),
   aff_history_quota: z.number().optional(),
   inviter_id: z.number().optional(),
+  referral_mode: z.string().optional(),
+  agent_enabled: z.boolean().optional(),
+  agent_use_default_rates: z.boolean().optional(),
+  agent_first_topup_rate: z.number().optional(),
+  agent_repeat_topup_rate: z.number().optional(),
+  agent_commission_balance: z.number().optional(),
+  agent_commission_total: z.number().optional(),
+  agent_commission_withdrawn: z.number().optional(),
   linux_do_id: z.string().optional(),
   status: userStatusSchema,
   role: userRoleSchema,
@@ -111,6 +119,10 @@ export interface UserFormData {
   quota?: number // Only used when updating user
   group?: string // Only used when updating user
   remark?: string // Only used when updating user
+  agent_enabled?: boolean
+  agent_use_default_rates?: boolean
+  agent_first_topup_rate?: number
+  agent_repeat_topup_rate?: number
   admin_permissions?: AdminPermissionMatrix
 }
 

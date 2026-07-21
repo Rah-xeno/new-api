@@ -42,6 +42,7 @@ export const DEFAULT_ADMIN_CONFIG = {
   personal: {
     enabled: true,
     topup: true,
+    agentDistribution: true,
     personal: true,
   },
   admin: {
@@ -79,6 +80,7 @@ export const mergeAdminConfig = (savedConfig) => {
 export const useSidebar = () => {
   const [statusState] = useContext(StatusContext);
   const [userConfig, setUserConfig] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const instanceIdRef = useRef(null);
   const hasLoadedOnceRef = useRef(false);
@@ -114,6 +116,7 @@ export const useSidebar = () => {
       }
 
       const res = await API.get('/api/user/self');
+      setCurrentUser(res.data.success ? res.data.data : null);
       if (res.data.success && res.data.data.sidebar_modules) {
         let config;
         // 检查sidebar_modules是字符串还是对象
@@ -297,5 +300,6 @@ export const useSidebar = () => {
     hasSectionVisibleModules,
     getVisibleModules,
     refreshUserConfig,
+    currentUser,
   };
 };

@@ -111,6 +111,10 @@ func SetApiRouter(router *gin.Engine) {
 				// Invite
 				selfRoute.GET("/invite/dashboard", controller.GetSelfInviteDashboard)
 				selfRoute.GET("/invite/logs", controller.GetSelfInviteLogs)
+				selfRoute.GET("/agent/dashboard", controller.GetSelfAgentDashboard)
+				selfRoute.GET("/agent/insights", controller.GetSelfAgentInsights)
+				selfRoute.GET("/agent/records", controller.GetSelfAgentRecords)
+				selfRoute.GET("/agent/topups", controller.GetSelfAgentTopUps)
 
 				// 2FA routes
 				selfRoute.GET("/2fa/status", controller.Get2FAStatus)
@@ -138,6 +142,7 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/:id/oauth/bindings", controller.GetUserOAuthBindingsByAdmin)
 				adminRoute.DELETE("/:id/oauth/bindings/:provider_id", controller.UnbindCustomOAuthByAdmin)
 				adminRoute.DELETE("/:id/bindings/:binding_type", controller.AdminClearUserBinding)
+				adminRoute.POST("/:id/agent-withdraw", controller.AdminWithdrawAgentCommission)
 				adminRoute.GET("/:id", controller.GetUser)
 				adminRoute.POST("/", controller.CreateUser)
 				adminRoute.POST("/manage", controller.ManageUser)

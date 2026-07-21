@@ -41,6 +41,10 @@ export const userFormSchema = z.object({
   quota_dollars: z.number().min(0).optional(),
   group: z.string().optional(),
   remark: z.string().optional(),
+  agent_enabled: z.boolean(),
+  agent_use_default_rates: z.boolean(),
+  agent_first_topup_rate: z.number().min(0).max(100),
+  agent_repeat_topup_rate: z.number().min(0).max(100),
   admin_permissions: z
     .record(z.string(), z.record(z.string(), z.boolean()))
     .optional(),
@@ -60,6 +64,10 @@ export const USER_FORM_DEFAULT_VALUES: UserFormValues = {
   quota_dollars: 0,
   group: DEFAULT_GROUP,
   remark: '',
+  agent_enabled: false,
+  agent_use_default_rates: true,
+  agent_first_topup_rate: 0,
+  agent_repeat_topup_rate: 0,
   // Filled against the backend catalog at render time; see UsersMutateDrawer.
   admin_permissions: {},
 }
@@ -101,6 +109,10 @@ export function transformFormDataToPayload(
     // For update: quota is adjusted atomically via /api/user/manage, not sent here
     payload.group = data.group
     payload.remark = data.remark || undefined
+    payload.agent_enabled = data.agent_enabled
+    payload.agent_use_default_rates = data.agent_use_default_rates
+    payload.agent_first_topup_rate = data.agent_first_topup_rate
+    payload.agent_repeat_topup_rate = data.agent_repeat_topup_rate
     payload.id = userId
   }
 
@@ -121,6 +133,10 @@ export function transformUserToFormDefaults(user: User): UserFormValues {
     quota_dollars: quotaUnitsToDollars(user.quota),
     group: user.group || DEFAULT_GROUP,
     remark: user.remark || '',
+    agent_enabled: user.agent_enabled ?? false,
+    agent_use_default_rates: user.agent_use_default_rates ?? true,
+    agent_first_topup_rate: user.agent_first_topup_rate ?? 0,
+    agent_repeat_topup_rate: user.agent_repeat_topup_rate ?? 0,
     admin_permissions: user.admin_permissions ?? {},
   }
 }
