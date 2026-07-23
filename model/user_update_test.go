@@ -6,6 +6,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -151,6 +152,58 @@ func TestInsertKeepsBlankPasswordForPasswordlessUser(t *testing.T) {
 	var stored User
 	require.NoError(t, DB.Where("username = ?", user.Username).First(&stored).Error)
 	assert.Empty(t, stored.Password)
+}
+
+func TestInsertCountsInviteWhenLegacyInviterRewardIsDisabled(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	paymentSetting := operation_setting.GetPaymentSetting()
+	originalComplianceConfirmed := paymentSetting.ComplianceConfirmed
+	originalComplianceTermsVersion := paymentSetting.ComplianceTermsVersion
+	originalQuotaForNewUser := common.QuotaForNewUser
+	originalQuotaForInvitee := common.QuotaForInvitee
+	originalQuotaForInviter := common.QuotaForInviter
+	t.Cleanup(func() {
+		paymentSetting.ComplianceConfirmed = originalComplianceConfirmed
+		paymentSetting.ComplianceTermsVersion = originalComplianceTermsVersion
+		common.QuotaForNewUser = originalQuotaForNewUser
+		common.QuotaForInvitee = originalQuotaForInvitee
+		common.QuotaForInviter = originalQuotaForInviter
+	})
+
+	paymentSetting.ComplianceConfirmed = true
+	paymentSetting.ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
+	common.QuotaForNewUser = 0
+	common.QuotaForInvitee = 0
+	common.QuotaForInviter = 0
+
+	inviter := User{
+		Username:        "invite-count-inviter",
+		Password:        "password",
+		Status:          common.UserStatusEnabled,
+		AffCount:        2,
+		AffQuota:        100,
+		AffHistoryQuota: 200,
+	}
+	require.NoError(t, DB.Create(&inviter).Error)
+
+	invitee := &User{
+		Username: "invite-count-invitee",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+	}
+	require.NoError(t, invitee.Insert(inviter.Id))
+
+	var storedInviter User
+	require.NoError(t, DB.First(&storedInviter, inviter.Id).Error)
+	assert.Equal(t, 3, storedInviter.AffCount)
+	assert.Equal(t, 100, storedInviter.AffQuota)
+	assert.Equal(t, 200, storedInviter.AffHistoryQuota)
+
+	var storedInvitee User
+	require.NoError(t, DB.First(&storedInvitee, invitee.Id).Error)
+	assert.Equal(t, inviter.Id, storedInvitee.InviterId)
+	assert.Equal(t, ReferralModeInvite, storedInvitee.ReferralMode)
 }
 
 func TestValidateAndFillRejectsPasswordlessUser(t *testing.T) {

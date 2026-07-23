@@ -29,6 +29,7 @@ import ReactDOM from 'react-dom/client'
 import { toast } from 'sonner'
 
 import { getStatus } from '@/lib/api'
+import { installAssetLoadRecovery } from '@/lib/asset-load-recovery'
 import { installBuildMetadata } from '@/lib/build-metadata'
 import { applyFaviconToDom } from '@/lib/dom-utils'
 import '@/lib/dayjs'
@@ -48,6 +49,7 @@ import './styles/index.css'
 
 // Ensure VChart theme is initialized before any chart mounts (prevents white default theme flash)
 // VChart theme is driven by our ThemeProvider (html.light/html.dark) via per-chart `theme` prop.
+installAssetLoadRecovery()
 initializeFrontendCache()
 installBuildMetadata()
 
@@ -116,7 +118,10 @@ declare module '@tanstack/react-router' {
 }
 
 // Render the app
-const rootElement = document.getElementById('root')!
+const rootElement = document.querySelector<HTMLElement>('#root')
+if (!rootElement) {
+  throw new Error('Root element not found')
+}
 // Set document.title and favicon from cached status, then refresh from network
 ;(function initSystemBranding() {
   try {
