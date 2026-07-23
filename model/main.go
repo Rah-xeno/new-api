@@ -270,6 +270,9 @@ func migrateDB() error {
 	if err := migrateTokenModelLimitsToText(); err != nil {
 		return err
 	}
+	if err := migrateQuotaColumnsToBigint(); err != nil {
+		return err
+	}
 
 	if skip, err := shouldSkipLegacyAgentSQLiteAutoMigrate("users"); err != nil {
 		return err
@@ -340,6 +343,9 @@ func migrateDB() error {
 }
 
 func migrateDBFast() error {
+	if err := migrateQuotaColumnsToBigint(); err != nil {
+		return err
+	}
 
 	var wg sync.WaitGroup
 
@@ -625,6 +631,73 @@ PRIMARY KEY (` + "`id`" + `)
 		if err := DB.Exec("ALTER TABLE `" + tableName + "` ADD COLUMN " + col.DDL).Error; err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// migrateQuotaColumnsToBigint widens persisted balances and cumulative quota
+// counters before AutoMigrate inspects the int64-backed model fields. SQLite's
+// INTEGER storage class is already a signed 64-bit value, so only MySQL and
+// PostgreSQL need schema changes.
+func migrateQuotaColumnsToBigint() error {
+	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+		return nil
+	}
+
+	columns := []struct {
+		table        string
+		column       string
+		mysqlDefault string
+	}{
+		{table: "users", column: "quota", mysqlDefault: "0"},
+		{table: "users", column: "used_quota", mysqlDefault: "0"},
+		{table: "users", column: "aff_quota", mysqlDefault: "0"},
+		{table: "users", column: "aff_history", mysqlDefault: "0"},
+		{table: "tokens", column: "remain_quota", mysqlDefault: "0"},
+		{table: "tokens", column: "used_quota", mysqlDefault: "0"},
+		{table: "redemptions", column: "quota", mysqlDefault: "100"},
+		{table: "channels", column: "used_quota", mysqlDefault: "0"},
+		{table: "quota_data", column: "quota", mysqlDefault: "0"},
+	}
+
+	for _, item := range columns {
+		if !DB.Migrator().HasTable(item.table) || !DB.Migrator().HasColumn(item.table, item.column) {
+			continue
+		}
+
+		var dataType string
+		var alterSQL string
+		switch {
+		case common.UsingMainDatabase(common.DatabaseTypePostgreSQL):
+			if err := DB.Raw(`SELECT data_type FROM information_schema.columns
+				WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`,
+				item.table, item.column).Scan(&dataType).Error; err != nil {
+				return fmt.Errorf("query quota column type %s.%s: %w", item.table, item.column, err)
+			}
+			if strings.EqualFold(dataType, "bigint") {
+				continue
+			}
+			alterSQL = fmt.Sprintf(`ALTER TABLE "%s" ALTER COLUMN "%s" TYPE BIGINT`,
+				item.table, item.column)
+		case common.UsingMainDatabase(common.DatabaseTypeMySQL):
+			if err := DB.Raw(`SELECT COLUMN_TYPE FROM information_schema.columns
+				WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+				item.table, item.column).Scan(&dataType).Error; err != nil {
+				return fmt.Errorf("query quota column type %s.%s: %w", item.table, item.column, err)
+			}
+			if strings.HasPrefix(strings.ToLower(dataType), "bigint") {
+				continue
+			}
+			alterSQL = fmt.Sprintf("ALTER TABLE `%s` MODIFY COLUMN `%s` BIGINT DEFAULT %s",
+				item.table, item.column, item.mysqlDefault)
+		default:
+			return nil
+		}
+
+		if err := DB.Exec(alterSQL).Error; err != nil {
+			return fmt.Errorf("migrate quota column %s.%s to bigint: %w", item.table, item.column, err)
+		}
+		common.SysLog(fmt.Sprintf("migrated quota column %s.%s to BIGINT", item.table, item.column))
 	}
 	return nil
 }

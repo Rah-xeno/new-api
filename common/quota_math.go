@@ -146,3 +146,17 @@ func QuotaFromDecimalChecked(d decimal.Decimal) (int, *QuotaClamp) {
 	f, _ := d.Round(0).Float64()
 	return saturateQuota(f, "QuotaFromDecimal")
 }
+
+// QuotaFromDecimal64Strict rounds a decimal balance delta to int64 without
+// allowing saturation. Account balances and top-up amounts are persisted as
+// BIGINT, so callers must fail when a computed delta cannot be represented
+// instead of silently crediting a saturated amount.
+func QuotaFromDecimal64Strict(d decimal.Decimal) (int64, error) {
+	rounded := d.Round(0)
+	maxQuota := decimal.NewFromInt(math.MaxInt64)
+	minQuota := decimal.NewFromInt(math.MinInt64)
+	if rounded.GreaterThan(maxQuota) || rounded.LessThan(minQuota) {
+		return 0, fmt.Errorf("quota conversion (QuotaFromDecimal64Strict) overflow: original=%s", rounded.String())
+	}
+	return rounded.IntPart(), nil
+}

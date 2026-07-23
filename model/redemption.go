@@ -20,7 +20,7 @@ type Redemption struct {
 	Key          string         `json:"key" gorm:"type:char(32);uniqueIndex"`
 	Status       int            `json:"status" gorm:"default:1"`
 	Name         string         `json:"name" gorm:"index"`
-	Quota        int            `json:"quota" gorm:"default:100"`
+	Quota        int64          `json:"quota" gorm:"default:100"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
 	RedeemedTime int64          `json:"redeemed_time" gorm:"bigint"`
 	Count        int            `json:"count" gorm:"-:all"` // only for api request
@@ -137,7 +137,7 @@ func GetRedemptionById(id int) (*Redemption, error) {
 	return &redemption, err
 }
 
-func Redeem(key string, userId int) (quota int, err error) {
+func Redeem(key string, userId int) (quota int64, err error) {
 	if key == "" {
 		return 0, errors.New("未提供兑换码")
 	}
@@ -171,7 +171,15 @@ func Redeem(key string, userId int) (quota int, err error) {
 			return errors.New("该兑换码已过期")
 		}
 		// Apply TopupGroupRatio to calculate actual quota
-		actualQuota := common.QuotaRound(float64(redemption.Quota) * topupRatio)
+		actualQuota, quotaErr := common.QuotaFromDecimal64Strict(
+			decimal.NewFromInt(redemption.Quota).Mul(decimal.NewFromFloat(topupRatio)),
+		)
+		if quotaErr != nil {
+			return quotaErr
+		}
+		if actualQuota <= 0 {
+			return errors.New("无效的兑换额度")
+		}
 		// Compare-and-swap on status: only the transaction that flips
 		// enabled -> used may credit quota, so a concurrent redeem of the
 		// same code loses here even without a row lock (e.g. on SQLite).
@@ -203,7 +211,7 @@ func Redeem(key string, userId int) (quota int, err error) {
 			if NormalizeReferralMode(invitee.ReferralMode) == ReferralModeAgentDistribution {
 				sourceAmountCents := int64(0)
 				if common.QuotaPerUnit > 0 && operation_setting.Price > 0 {
-					sourceAmountCents = decimal.NewFromInt(int64(actualQuota)).Div(decimal.NewFromFloat(common.QuotaPerUnit)).Mul(decimal.NewFromFloat(operation_setting.Price)).Mul(decimal.NewFromInt(100)).Round(0).IntPart()
+					sourceAmountCents = decimal.NewFromInt(actualQuota).Div(decimal.NewFromFloat(common.QuotaPerUnit)).Mul(decimal.NewFromFloat(operation_setting.Price)).Mul(decimal.NewFromInt(100)).Round(0).IntPart()
 				}
 				userErr = tx.Transaction(func(commissionTx *gorm.DB) error {
 					var commissionErr error
@@ -230,7 +238,13 @@ func Redeem(key string, userId int) (quota int, err error) {
 		return 0, ErrRedeemFailed
 	}
 	ApplyAgentCommissionSideEffects(agentCommissionOutcome)
-	actualQuota := common.QuotaRound(float64(redemption.Quota) * topupRatio)
+	actualQuota, err := common.QuotaFromDecimal64Strict(
+		decimal.NewFromInt(redemption.Quota).Mul(decimal.NewFromFloat(topupRatio)),
+	)
+	if err != nil {
+		common.SysError("redemption quota conversion failed: " + err.Error())
+		return 0, ErrRedeemFailed
+	}
 	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(actualQuota), redemption.Id))
 	return actualQuota, nil
 }

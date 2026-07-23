@@ -9,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -226,7 +227,7 @@ func GetRewardRecords(db *gorm.DB, planId int, page int, pageSize int) ([]Invite
 //     the last EffectiveDays days. After that window, no reward is given.
 //   - MaxInviteesPerInviter: if set, caps total reward records for this
 //     (plan, inviter) pair.
-//   - Reward = QuotaRound(paymentQuota * rewardPercent / 100), capped at
+//   - Reward is rounded from paymentQuota * rewardPercent / 100, capped at
 //     RewardMaxQuota.
 //
 // Called inside the payment DB transaction (tx). Returns rewardQuota > 0
@@ -239,9 +240,9 @@ func HandleInviteRewardForPayment(
 	inviteeCreatedAt int64,
 	sourceType string,
 	sourceTradeNo string,
-	paymentQuota int,
+	paymentQuota int64,
 	logFunc func(int, string),
-) (rewardQuota int, err error) {
+) (rewardQuota int64, err error) {
 	if inviterId == 0 {
 		return 0, nil
 	}
@@ -265,7 +266,7 @@ func HandleInviteRewardForPayment(
 		}
 
 		// Min trigger quota check
-		if plan.TriggerTopupQuota > 0 && int64(paymentQuota) < plan.TriggerTopupQuota {
+		if plan.TriggerTopupQuota > 0 && paymentQuota < plan.TriggerTopupQuota {
 			continue
 		}
 
@@ -301,9 +302,16 @@ func HandleInviteRewardForPayment(
 			continue
 		}
 
-		reward := common.QuotaRound(float64(paymentQuota) * rewardPercent / 100.0)
-		if plan.RewardMaxQuota > 0 && int64(reward) > plan.RewardMaxQuota {
-			reward = int(plan.RewardMaxQuota)
+		reward, quotaErr := common.QuotaFromDecimal64Strict(
+			decimal.NewFromInt(paymentQuota).
+				Mul(decimal.NewFromFloat(rewardPercent)).
+				Div(decimal.NewFromInt(100)),
+		)
+		if quotaErr != nil {
+			return 0, quotaErr
+		}
+		if plan.RewardMaxQuota > 0 && reward > plan.RewardMaxQuota {
+			reward = plan.RewardMaxQuota
 		}
 		if reward <= 0 {
 			continue
@@ -325,9 +333,9 @@ func HandleInviteRewardForPayment(
 			SourceType:    sourceType,
 			SourceTradeNo: sourceTradeNo,
 			TriggerType:   sourceType,
-			TriggerQuota:  int64(paymentQuota),
+			TriggerQuota:  paymentQuota,
 			RewardType:    InvitePlanRewardQuota,
-			RewardQuota:   int64(reward),
+			RewardQuota:   reward,
 			CreatedAt:     now,
 		}
 		if err := tx.Create(record).Error; err != nil {

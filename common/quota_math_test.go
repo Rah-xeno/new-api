@@ -124,3 +124,15 @@ func TestQuotaFromDecimalChecked(t *testing.T) {
 		assert.Equal(t, QuotaClampOverflow, clamp.Kind)
 	}
 }
+
+func TestQuotaFromDecimal64StrictPreservesLargeBalanceDelta(t *testing.T) {
+	quota, err := QuotaFromDecimal64Strict(decimal.NewFromInt(2_500_000_000))
+	require.NoError(t, err)
+	assert.Equal(t, int64(2_500_000_000), quota)
+
+	quota, err = QuotaFromDecimal64Strict(
+		decimal.NewFromInt(math.MaxInt64).Add(decimal.NewFromInt(1)),
+	)
+	assert.Zero(t, quota)
+	assert.ErrorContains(t, err, "overflow")
+}

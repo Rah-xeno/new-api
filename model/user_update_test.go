@@ -58,8 +58,8 @@ func TestUserUpdateDoesNotOverwriteAccountingFields(t *testing.T) {
 	var got User
 	require.NoError(t, DB.First(&got, user.Id).Error)
 	assert.Equal(t, "after", got.DisplayName)
-	assert.Equal(t, 600, got.Quota)
-	assert.Equal(t, 420, got.UsedQuota)
+	assert.Equal(t, int64(600), got.Quota)
+	assert.Equal(t, int64(420), got.UsedQuota)
 	assert.Equal(t, 4, got.RequestCount)
 }
 
@@ -87,8 +87,8 @@ func TestUpdateUserSettingOnlyUpdatesSetting(t *testing.T) {
 
 	var got User
 	require.NoError(t, DB.First(&got, user.Id).Error)
-	assert.Equal(t, 750, got.Quota)
-	assert.Equal(t, 270, got.UsedQuota)
+	assert.Equal(t, int64(750), got.Quota)
+	assert.Equal(t, int64(270), got.UsedQuota)
 	assert.Equal(t, 4, got.RequestCount)
 	assert.Equal(t, "zh", got.GetSetting().Language)
 }
@@ -197,8 +197,8 @@ func TestInsertCountsInviteWhenLegacyInviterRewardIsDisabled(t *testing.T) {
 	var storedInviter User
 	require.NoError(t, DB.First(&storedInviter, inviter.Id).Error)
 	assert.Equal(t, 3, storedInviter.AffCount)
-	assert.Equal(t, 100, storedInviter.AffQuota)
-	assert.Equal(t, 200, storedInviter.AffHistoryQuota)
+	assert.Equal(t, int64(100), storedInviter.AffQuota)
+	assert.Equal(t, int64(200), storedInviter.AffHistoryQuota)
 
 	var storedInvitee User
 	require.NoError(t, DB.First(&storedInvitee, invitee.Id).Error)

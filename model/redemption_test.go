@@ -115,7 +115,7 @@ func TestSearchRedemptionsFiltersAndPaginates(t *testing.T) {
 	}
 }
 
-func setupRedeemFixture(t *testing.T, quota int) (userId int, key string) {
+func setupRedeemFixture(t *testing.T, quota int64) (userId int, key string) {
 	t.Helper()
 	require.NoError(t, DB.AutoMigrate(&Redemption{}))
 	require.NoError(t, DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Unscoped().Delete(&Redemption{}).Error)
@@ -145,11 +145,11 @@ func TestRedeemCreditsQuotaExactlyOnce(t *testing.T) {
 
 	quota, err := Redeem(key, userId)
 	require.NoError(t, err)
-	assert.Equal(t, 500, quota)
+	assert.Equal(t, int64(500), quota)
 
 	var user User
 	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
-	assert.Equal(t, 500, user.Quota)
+	assert.Equal(t, int64(500), user.Quota)
 
 	var redemption Redemption
 	require.NoError(t, DB.First(&redemption, "name = ?", "redeem-test").Error)
@@ -160,7 +160,20 @@ func TestRedeemCreditsQuotaExactlyOnce(t *testing.T) {
 	_, err = Redeem(key, userId)
 	require.Error(t, err)
 	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
-	assert.Equal(t, 500, user.Quota)
+	assert.Equal(t, int64(500), user.Quota)
+}
+
+func TestRedeemCreditsQuotaBeyondInt32(t *testing.T) {
+	const redemptionQuota int64 = 2_500_000_000
+	userId, key := setupRedeemFixture(t, redemptionQuota)
+
+	quota, err := Redeem(key, userId)
+	require.NoError(t, err)
+	assert.Equal(t, redemptionQuota, quota)
+
+	var user User
+	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
+	assert.Equal(t, redemptionQuota, user.Quota)
 }
 
 // Exactly one of several concurrent redeems of the same code may win, and
@@ -192,11 +205,11 @@ func TestRedeemConcurrentSingleSuccess(t *testing.T) {
 
 	var user User
 	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
-	assert.Equal(t, 300, user.Quota, "quota must be credited exactly once")
+	assert.Equal(t, int64(300), user.Quota, "quota must be credited exactly once")
 }
 
 func TestRedeemStillSucceedsWhenAgentCommissionFails(t *testing.T) {
-	const redemptionQuota = 5_000_000
+	const redemptionQuota int64 = 5_000_000
 	userId, key := setupRedeemFixture(t, redemptionQuota)
 
 	agent := &User{

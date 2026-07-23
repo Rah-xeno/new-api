@@ -852,15 +852,16 @@ func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *
 	return nil
 }
 
-func UpdateChannelUsedQuota(id int, quota int) {
+func UpdateChannelUsedQuota[T quotaValue](id int, quota T) {
+	quotaDelta := int64(quota)
 	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeChannelUsedQuota, id, quota)
+		addNewRecord(BatchUpdateTypeChannelUsedQuota, id, quotaDelta)
 		return
 	}
-	updateChannelUsedQuota(id, quota)
+	updateChannelUsedQuota(id, quotaDelta)
 }
 
-func updateChannelUsedQuota(id int, quota int) {
+func updateChannelUsedQuota(id int, quota int64) {
 	err := DB.Model(&Channel{}).Where("id = ?", id).Update("used_quota", gorm.Expr("used_quota + ?", quota)).Error
 	if err != nil {
 		common.SysLog(fmt.Sprintf("failed to update channel used quota: channel_id=%d, delta_quota=%d, error=%v", id, quota, err))
