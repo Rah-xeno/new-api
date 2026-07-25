@@ -22,6 +22,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { Main } from '@/components/layout'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -243,128 +244,143 @@ export function AdminAnalytics() {
   ]
 
   return (
-    <div className='flex flex-1 flex-col gap-4'>
-      <Card>
-        <CardHeader>
-          <div className='flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'>
-            <div className='flex items-start gap-3'>
-              <IconBadge tone='primary' size='lg'>
-                <BarChart3 />
-              </IconBadge>
-              <div>
-                <CardTitle className='text-xl'>{t('Data analytics')}</CardTitle>
-                <CardDescription className='mt-1 max-w-2xl'>
-                  {t(
-                    'Explore model usage, channel reliability, income, user growth and cache efficiency for one period.'
+    <Main>
+      <div className='min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-6'>
+        <div className='flex flex-col gap-4'>
+          <Card>
+            <CardHeader>
+              <div className='flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'>
+                <div className='flex items-start gap-3'>
+                  <IconBadge tone='primary' size='lg'>
+                    <BarChart3 />
+                  </IconBadge>
+                  <div>
+                    <CardTitle className='text-xl'>
+                      {t('Data analytics')}
+                    </CardTitle>
+                    <CardDescription className='mt-1 max-w-2xl'>
+                      {t(
+                        'Explore model usage, channel reliability, income, user growth and cache efficiency for one period.'
+                      )}
+                    </CardDescription>
+                  </div>
+                </div>
+                <Badge variant='secondary'>
+                  {t('Current period')}: {appliedRange.start} –{' '}
+                  {appliedRange.end}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className='flex flex-col gap-3'>
+              <div className='flex flex-col gap-3 lg:flex-row lg:items-end'>
+                <div className='grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2'>
+                  <div className='flex flex-col gap-1.5'>
+                    <Label htmlFor='analytics-start-date'>
+                      {t('Start date')}
+                    </Label>
+                    <Input
+                      id='analytics-start-date'
+                      type='date'
+                      value={draftRange.start}
+                      max={draftRange.end}
+                      onChange={(event) =>
+                        setDraftRange((current) => ({
+                          ...current,
+                          start: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className='flex flex-col gap-1.5'>
+                    <Label htmlFor='analytics-end-date'>{t('End date')}</Label>
+                    <Input
+                      id='analytics-end-date'
+                      type='date'
+                      value={draftRange.end}
+                      min={draftRange.start}
+                      onChange={(event) =>
+                        setDraftRange((current) => ({
+                          ...current,
+                          end: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={() => applyRange(draftRange)}
+                  disabled={reportQuery.isFetching}
+                >
+                  {reportQuery.isFetching ? (
+                    <Spinner data-icon='inline-start' />
+                  ) : (
+                    <RefreshCw data-icon='inline-start' />
                   )}
-                </CardDescription>
+                  {t('Refresh report')}
+                </Button>
               </div>
-            </div>
-            <Badge variant='secondary'>
-              {t('Current period')}: {appliedRange.start} – {appliedRange.end}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className='flex flex-col gap-3'>
-          <div className='flex flex-col gap-3 lg:flex-row lg:items-end'>
-            <div className='grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2'>
-              <div className='flex flex-col gap-1.5'>
-                <Label htmlFor='analytics-start-date'>{t('Start date')}</Label>
-                <Input
-                  id='analytics-start-date'
-                  type='date'
-                  value={draftRange.start}
-                  max={draftRange.end}
-                  onChange={(event) =>
-                    setDraftRange((current) => ({
-                      ...current,
-                      start: event.target.value,
-                    }))
-                  }
-                />
+              <div className='flex flex-wrap gap-2'>
+                {QUICK_RANGES.map((range) => (
+                  <Button
+                    key={range.key}
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    onClick={() => applyRange(range.getRange())}
+                  >
+                    {t(range.label)}
+                  </Button>
+                ))}
               </div>
-              <div className='flex flex-col gap-1.5'>
-                <Label htmlFor='analytics-end-date'>{t('End date')}</Label>
-                <Input
-                  id='analytics-end-date'
-                  type='date'
-                  value={draftRange.end}
-                  min={draftRange.start}
-                  onChange={(event) =>
-                    setDraftRange((current) => ({
-                      ...current,
-                      end: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-            <Button
-              onClick={() => applyRange(draftRange)}
-              disabled={reportQuery.isFetching}
-            >
-              {reportQuery.isFetching ? (
-                <Spinner data-icon='inline-start' />
-              ) : (
-                <RefreshCw data-icon='inline-start' />
+            </CardContent>
+          </Card>
+
+          {reportQuery.error ? (
+            <Alert variant='destructive'>
+              <AlertCircle />
+              <AlertTitle>{t('Unable to load analytics')}</AlertTitle>
+              <AlertDescription>{reportQuery.error.message}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <SummaryMetricCards
+            metrics={summaryMetrics}
+            loading={reportQuery.isLoading}
+          />
+
+          <div className='grid grid-cols-1 gap-4 xl:grid-cols-3'>
+            <MetricSection
+              title={t('Invite referrals')}
+              description={t(
+                'Top-ups and rewards from standard invite referrals.'
               )}
-              {t('Refresh report')}
-            </Button>
+              metrics={inviteMetrics}
+              loading={reportQuery.isLoading}
+            />
+            <MetricSection
+              title={t('Agent distribution')}
+              description={t(
+                'Top-ups, commissions and net agent contribution.'
+              )}
+              metrics={agentMetrics}
+              loading={reportQuery.isLoading}
+            />
+            <MetricSection
+              title={t('Cache efficiency')}
+              description={t(
+                'Cache reads, writes and estimated quota savings.'
+              )}
+              metrics={cacheMetrics}
+              loading={reportQuery.isLoading}
+            />
           </div>
-          <div className='flex flex-wrap gap-2'>
-            {QUICK_RANGES.map((range) => (
-              <Button
-                key={range.key}
-                type='button'
-                variant='outline'
-                size='sm'
-                onClick={() => applyRange(range.getRange())}
-              >
-                {t(range.label)}
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
-      {reportQuery.error ? (
-        <Alert variant='destructive'>
-          <AlertCircle />
-          <AlertTitle>{t('Unable to load analytics')}</AlertTitle>
-          <AlertDescription>{reportQuery.error.message}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <SummaryMetricCards
-        metrics={summaryMetrics}
-        loading={reportQuery.isLoading}
-      />
-
-      <div className='grid grid-cols-1 gap-4 xl:grid-cols-3'>
-        <MetricSection
-          title={t('Invite referrals')}
-          description={t('Top-ups and rewards from standard invite referrals.')}
-          metrics={inviteMetrics}
-          loading={reportQuery.isLoading}
-        />
-        <MetricSection
-          title={t('Agent distribution')}
-          description={t('Top-ups, commissions and net agent contribution.')}
-          metrics={agentMetrics}
-          loading={reportQuery.isLoading}
-        />
-        <MetricSection
-          title={t('Cache efficiency')}
-          description={t('Cache reads, writes and estimated quota savings.')}
-          metrics={cacheMetrics}
-          loading={reportQuery.isLoading}
-        />
+          <RankingCharts report={report} loading={reportQuery.isLoading} />
+          <ChannelCharts report={report} loading={reportQuery.isLoading} />
+          <GroupCharts report={report} loading={reportQuery.isLoading} />
+          <TrendCharts report={report} loading={reportQuery.isLoading} />
+        </div>
       </div>
-
-      <RankingCharts report={report} loading={reportQuery.isLoading} />
-      <ChannelCharts report={report} loading={reportQuery.isLoading} />
-      <GroupCharts report={report} loading={reportQuery.isLoading} />
-      <TrendCharts report={report} loading={reportQuery.isLoading} />
-    </div>
+    </Main>
   )
 }
