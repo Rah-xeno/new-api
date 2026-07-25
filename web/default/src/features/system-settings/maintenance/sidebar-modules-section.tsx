@@ -138,6 +138,10 @@ export function SidebarModulesSection({
         title: t('Channels'),
         description: t('Configure upstream providers and routing.'),
       },
+      analytics: {
+        title: t('Data analytics'),
+        description: t('Review global usage, reliability and revenue trends.'),
+      },
       models: {
         title: t('Models'),
         description: t('Manage catalog visibility and pricing.'),
