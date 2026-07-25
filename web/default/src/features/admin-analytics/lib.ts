@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { toIntlLocale } from '@/i18n/languages'
 import { formatLocalCurrencyAmount } from '@/lib/currency'
 import dayjs from '@/lib/dayjs'
 import { formatNumber, formatPercent, formatQuota } from '@/lib/format'
@@ -76,11 +77,11 @@ export function formatAnalyticsPercent(value: number): string {
 
 export function formatAnalyticsSeconds(
   value: number,
-  locale?: Intl.LocalesArgument
+  language?: string | null
 ): string {
   const numericValue = Number(value || 0)
   if (!Number.isFinite(numericValue) || numericValue <= 0) return '0 s'
-  return Intl.NumberFormat(locale, {
+  return Intl.NumberFormat(toIntlLocale(language), {
     style: 'unit',
     unit: 'second',
     unitDisplay: 'short',
