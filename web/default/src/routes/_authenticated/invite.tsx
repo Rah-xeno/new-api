@@ -20,6 +20,14 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { InvitePage } from '@/features/invite'
 
+function InviteRoute() {
+  return (
+    <div className='min-h-0 flex-1 overflow-y-auto'>
+      <InvitePage />
+    </div>
+  )
+}
+
 export const Route = createFileRoute('/_authenticated/invite')({
-    component: InvitePage,
+  component: InviteRoute,
 })
