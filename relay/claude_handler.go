@@ -107,25 +107,35 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		info.UpstreamModelName = request.Model
 	}
 
-	if info.ChannelSetting.SystemPrompt != "" {
-		if request.System == nil {
-			request.SetStringSystem(info.ChannelSetting.SystemPrompt)
-		} else if info.ChannelSetting.SystemPromptOverride {
-			common.SetContextKey(c, constant.ContextKeySystemPromptOverride, true)
-			if request.IsStringSystem() {
-				existing := strings.TrimSpace(request.GetStringSystem())
-				if existing == "" {
-					request.SetStringSystem(info.ChannelSetting.SystemPrompt)
-				} else {
-					request.SetStringSystem(info.ChannelSetting.SystemPrompt + "\n" + existing)
-				}
+	if !model_setting.GetGlobalSettings().PassThroughRequestEnabled && !info.ChannelSetting.PassThroughBodyEnabled {
+		globalPrompt := strings.TrimSpace(constant.GlobalSystemPromptAppend)
+		channelPrompt := strings.TrimSpace(info.ChannelSetting.SystemPrompt)
+		hasSystem := request.System != nil
+		prefixParts := make([]string, 0, 2)
+		if globalPrompt != "" {
+			prefixParts = append(prefixParts, globalPrompt)
+		}
+		if channelPrompt != "" && (!hasSystem || info.ChannelSetting.SystemPromptOverride) {
+			prefixParts = append(prefixParts, channelPrompt)
+		}
+
+		if len(prefixParts) > 0 {
+			prefixText := strings.Join(prefixParts, "\n")
+			if !hasSystem {
+				request.SetStringSystem(prefixText)
 			} else {
-				systemContents := request.ParseSystem()
-				newSystem := dto.ClaudeMediaMessage{Type: dto.ContentTypeText}
-				newSystem.SetText(info.ChannelSetting.SystemPrompt)
-				if len(systemContents) == 0 {
-					request.System = []dto.ClaudeMediaMessage{newSystem}
+				common.SetContextKey(c, constant.ContextKeySystemPromptOverride, true)
+				if request.IsStringSystem() {
+					existing := request.GetStringSystem()
+					if strings.TrimSpace(existing) == "" {
+						request.SetStringSystem(prefixText)
+					} else {
+						request.SetStringSystem(prefixText + "\n" + existing)
+					}
 				} else {
+					systemContents := request.ParseSystem()
+					newSystem := dto.ClaudeMediaMessage{Type: dto.ContentTypeText}
+					newSystem.SetText(prefixText)
 					request.System = append([]dto.ClaudeMediaMessage{newSystem}, systemContents...)
 				}
 			}

@@ -95,28 +95,40 @@ func GeminiHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 
 	adaptor.Init(info)
 
-	if info.ChannelSetting.SystemPrompt != "" {
-		if request.SystemInstructions == nil {
-			request.SystemInstructions = &dto.GeminiChatContent{
-				Parts: []dto.GeminiPart{
-					{Text: info.ChannelSetting.SystemPrompt},
-				},
-			}
-		} else if len(request.SystemInstructions.Parts) == 0 {
-			request.SystemInstructions.Parts = []dto.GeminiPart{{Text: info.ChannelSetting.SystemPrompt}}
-		} else if info.ChannelSetting.SystemPromptOverride {
-			common.SetContextKey(c, constant.ContextKeySystemPromptOverride, true)
-			merged := false
-			for i := range request.SystemInstructions.Parts {
-				if request.SystemInstructions.Parts[i].Text == "" {
-					continue
+	if !model_setting.GetGlobalSettings().PassThroughRequestEnabled && !info.ChannelSetting.PassThroughBodyEnabled {
+		globalPrompt := strings.TrimSpace(constant.GlobalSystemPromptAppend)
+		channelPrompt := strings.TrimSpace(info.ChannelSetting.SystemPrompt)
+		hasSystem := request.SystemInstructions != nil && len(request.SystemInstructions.Parts) > 0
+		hasContent := false
+		if hasSystem {
+			for _, part := range request.SystemInstructions.Parts {
+				if strings.TrimSpace(part.Text) != "" {
+					hasContent = true
+					break
 				}
-				request.SystemInstructions.Parts[i].Text = info.ChannelSetting.SystemPrompt + "\n" + request.SystemInstructions.Parts[i].Text
-				merged = true
-				break
 			}
-			if !merged {
-				request.SystemInstructions.Parts = append([]dto.GeminiPart{{Text: info.ChannelSetting.SystemPrompt}}, request.SystemInstructions.Parts...)
+		}
+
+		prefixParts := make([]string, 0, 2)
+		if globalPrompt != "" {
+			prefixParts = append(prefixParts, globalPrompt)
+		}
+		if channelPrompt != "" && (!hasContent || info.ChannelSetting.SystemPromptOverride) {
+			prefixParts = append(prefixParts, channelPrompt)
+		}
+
+		if len(prefixParts) > 0 {
+			prefixText := strings.Join(prefixParts, "\n")
+			if !hasContent {
+				request.SystemInstructions = &dto.GeminiChatContent{
+					Parts: []dto.GeminiPart{{Text: prefixText}},
+				}
+			} else {
+				common.SetContextKey(c, constant.ContextKeySystemPromptOverride, true)
+				request.SystemInstructions.Parts = append(
+					[]dto.GeminiPart{{Text: prefixText}},
+					request.SystemInstructions.Parts...,
+				)
 			}
 		}
 	}
