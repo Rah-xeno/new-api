@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,4 +76,29 @@ func TestApplySystemPromptToResponsesRequestPreservesInstructionArray(t *testing
 	require.NoError(t, common.Unmarshal(instructions[0], &prefix))
 	assert.Equal(t, strings.TrimSpace(constant.GlobalSystemPromptAppend), prefix)
 	assert.JSONEq(t, `{"role":"developer","content":"existing"}`, string(instructions[1]))
+}
+
+func TestApplySystemPromptIfNeededHonorsGroupExemption(t *testing.T) {
+	require.NoError(t, setting.UpdateSystemPromptExemptGroupsByJSONString(`{"exempt":true}`))
+	t.Cleanup(func() {
+		require.NoError(t, setting.UpdateSystemPromptExemptGroupsByJSONString(`{}`))
+	})
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	info := &relaycommon.RelayInfo{
+		UsingGroup: "exempt",
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelSetting: dto.ChannelSettings{SystemPrompt: "channel prompt"},
+		},
+	}
+	request := &dto.GeneralOpenAIRequest{
+		Messages: []dto.Message{{Role: "user", Content: "hello"}},
+	}
+
+	applySystemPromptIfNeeded(c, info, request)
+
+	require.Len(t, request.Messages, 2)
+	assert.Equal(t, "system", request.Messages[0].Role)
+	assert.Equal(t, "channel prompt", request.Messages[0].StringContent())
+	assert.NotContains(t, request.Messages[0].StringContent(), strings.TrimSpace(constant.GlobalSystemPromptAppend))
 }

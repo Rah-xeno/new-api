@@ -96,7 +96,7 @@ func GeminiHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 	adaptor.Init(info)
 
 	if !model_setting.GetGlobalSettings().PassThroughRequestEnabled && !info.ChannelSetting.PassThroughBodyEnabled {
-		globalPrompt := strings.TrimSpace(constant.GlobalSystemPromptAppend)
+		globalPrompt := globalSystemPromptForGroup(info.UsingGroup)
 		channelPrompt := strings.TrimSpace(info.ChannelSetting.SystemPrompt)
 		hasSystem := request.SystemInstructions != nil && len(request.SystemInstructions.Parts) > 0
 		hasContent := false

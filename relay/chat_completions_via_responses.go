@@ -15,17 +15,25 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
 )
+
+func globalSystemPromptForGroup(group string) string {
+	if setting.IsGroupExemptFromSystemPrompt(group) {
+		return ""
+	}
+	return strings.TrimSpace(constant.GlobalSystemPromptAppend)
+}
 
 func applySystemPromptIfNeeded(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeneralOpenAIRequest) {
 	if info == nil || request == nil {
 		return
 	}
 
-	globalPrompt := strings.TrimSpace(constant.GlobalSystemPromptAppend)
+	globalPrompt := globalSystemPromptForGroup(info.UsingGroup)
 	channelPrompt := strings.TrimSpace(info.ChannelSetting.SystemPrompt)
 	if globalPrompt == "" && channelPrompt == "" {
 		return
@@ -85,7 +93,7 @@ func applySystemPromptToResponsesRequest(c *gin.Context, info *relaycommon.Relay
 		return
 	}
 
-	globalPrompt := strings.TrimSpace(constant.GlobalSystemPromptAppend)
+	globalPrompt := globalSystemPromptForGroup(info.UsingGroup)
 	channelPrompt := strings.TrimSpace(info.ChannelSetting.SystemPrompt)
 	hasExisting := len(request.Instructions) > 0 && string(request.Instructions) != "null"
 

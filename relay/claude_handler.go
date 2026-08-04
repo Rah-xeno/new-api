@@ -108,7 +108,7 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 	}
 
 	if !model_setting.GetGlobalSettings().PassThroughRequestEnabled && !info.ChannelSetting.PassThroughBodyEnabled {
-		globalPrompt := strings.TrimSpace(constant.GlobalSystemPromptAppend)
+		globalPrompt := globalSystemPromptForGroup(info.UsingGroup)
 		channelPrompt := strings.TrimSpace(info.ChannelSetting.SystemPrompt)
 		hasSystem := request.System != nil
 		prefixParts := make([]string, 0, 2)
