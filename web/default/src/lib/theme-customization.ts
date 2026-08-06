@@ -23,6 +23,11 @@ For commercial licensing, please contact support@quantumnous.com
  * provider without breaking React Fast Refresh boundaries.
  */
 
+// Default preset color preview. Keep the full gradient here so future color
+// adjustments only require changing one value.
+export const DEFAULT_THEME_PREVIEW_GRADIENT =
+  'linear-gradient(95deg, rgb(255, 157, 214) -17%, rgb(212, 181, 249) 4%, rgb(255, 209, 225) 52%, rgb(207, 173, 252) 756%, rgb(253, 75, 135) 104%)'
+
 export const THEME_PRESETS = [
   {
     value: 'default',
