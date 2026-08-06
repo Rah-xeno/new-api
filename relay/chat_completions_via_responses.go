@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel"
 	openaichannel "github.com/QuantumNous/new-api/relay/channel/openai"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -25,7 +26,7 @@ func globalSystemPromptForGroup(group string) string {
 	if setting.IsGroupExemptFromSystemPrompt(group) {
 		return ""
 	}
-	return strings.TrimSpace(constant.GlobalSystemPromptAppend)
+	return strings.TrimSpace(model.GetGlobalSystemPromptAppend())
 }
 
 func applySystemPromptIfNeeded(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeneralOpenAIRequest) {

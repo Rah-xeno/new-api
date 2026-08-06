@@ -32,6 +32,7 @@ const defaultSiteSettings: SiteSettings = {
   Footer: '',
   About: '',
   HomePageContent: '',
+  GlobalSystemPromptAppend: '',
   ServerAddress: '',
   'legal.user_agreement': '',
   'legal.privacy_policy': '',
