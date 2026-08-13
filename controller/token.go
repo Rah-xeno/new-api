@@ -21,6 +21,8 @@ func buildMaskedTokenResponse(token *model.Token) *model.Token {
 	}
 	maskedToken := *token
 	maskedToken.Key = token.GetMaskedKey()
+	maskedToken.Group = token.GetFirstGroup()
+	maskedToken.BackupGroup = token.GetBackupGroup()
 	return &maskedToken
 }
 
@@ -227,7 +229,7 @@ func AddToken(c *gin.Context) {
 		ModelLimits:        token.ModelLimits,
 		AllowIps:           token.AllowIps,
 		Group:              token.Group,
-		CrossGroupRetry:    token.CrossGroupRetry,
+		BackupGroup:        token.BackupGroup,
 	}
 	err = cleanToken.Insert()
 	if err != nil {
@@ -311,7 +313,7 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.ModelLimits = token.ModelLimits
 		cleanToken.AllowIps = token.AllowIps
 		cleanToken.Group = token.Group
-		cleanToken.CrossGroupRetry = token.CrossGroupRetry
+		cleanToken.BackupGroup = token.BackupGroup
 	}
 	err = cleanToken.Update()
 	if err != nil {

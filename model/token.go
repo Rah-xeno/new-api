@@ -27,7 +27,8 @@ type Token struct {
 	AllowIps           *string        `json:"allow_ips" gorm:"default:''"`
 	UsedQuota          int64          `json:"used_quota" gorm:"default:0"` // used quota
 	Group              string         `json:"group" gorm:"default:''"`
-	CrossGroupRetry    bool           `json:"cross_group_retry"` // 跨分组重试，仅auto分组有效
+	BackupGroup        string         `json:"backup_group" gorm:"type:varchar(64);default:''"`
+	CrossGroupRetry    bool           `json:"cross_group_retry"` // Deprecated: retained for database compatibility.
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 
@@ -94,6 +95,25 @@ func (token *Token) GetFirstGroup() string {
 		return ""
 	}
 	return strings.TrimSpace(groups[0])
+}
+
+// GetBackupGroup prefers the dedicated backup group and falls back to the
+// second entry from legacy multi-group token data.
+func (token *Token) GetBackupGroup() string {
+	backupGroup := strings.TrimSpace(token.BackupGroup)
+	if backupGroup != "" {
+		return backupGroup
+	}
+
+	group := strings.TrimSpace(token.Group)
+	if !strings.HasPrefix(group, "[") {
+		return ""
+	}
+	var groups []string
+	if err := common.UnmarshalJsonStr(group, &groups); err != nil || len(groups) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(groups[1])
 }
 
 func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
@@ -320,7 +340,7 @@ func (token *Token) Update() (err error) {
 		}
 	}()
 	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry").Updates(token).Error
+		"model_limits_enabled", "model_limits", "allow_ips", "group", "backup_group").Updates(token).Error
 	return err
 }
 

@@ -6,25 +6,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTokenGetFirstGroupSupportsLegacyMultiGroupValues(t *testing.T) {
+func TestTokenLegacyMultiGroupCompatibility(t *testing.T) {
 	tests := []struct {
-		name  string
-		group string
-		want  string
+		name       string
+		token      Token
+		wantGroup  string
+		wantBackup string
 	}{
-		{name: "empty inherits user group", group: "", want: ""},
-		{name: "single group", group: "default", want: "default"},
-		{name: "single group trims whitespace", group: " vip ", want: "vip"},
-		{name: "legacy multi group uses first", group: `["default","vip"]`, want: "default"},
-		{name: "legacy first group trims whitespace", group: `[" vip ","default"]`, want: "vip"},
-		{name: "legacy empty list inherits user group", group: `[]`, want: ""},
-		{name: "malformed JSON preserves original value", group: `["default"`, want: `["default"`},
+		{name: "empty inherits user group", token: Token{}, wantGroup: "", wantBackup: ""},
+		{name: "single group", token: Token{Group: "default"}, wantGroup: "default", wantBackup: ""},
+		{name: "single group trims whitespace", token: Token{Group: " vip "}, wantGroup: "vip", wantBackup: ""},
+		{name: "legacy groups use first and second", token: Token{Group: `["default","vip"]`}, wantGroup: "default", wantBackup: "vip"},
+		{name: "legacy groups trim whitespace", token: Token{Group: `[" vip "," backup "]`}, wantGroup: "vip", wantBackup: "backup"},
+		{name: "dedicated backup takes precedence", token: Token{Group: `["default","legacy"]`, BackupGroup: "current"}, wantGroup: "default", wantBackup: "current"},
+		{name: "legacy empty list inherits user group", token: Token{Group: `[]`}, wantGroup: "", wantBackup: ""},
+		{name: "malformed JSON preserves primary value", token: Token{Group: `["default"`}, wantGroup: `["default"`, wantBackup: ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			token := &Token{Group: tt.group}
-			assert.Equal(t, tt.want, token.GetFirstGroup())
+			assert.Equal(t, tt.wantGroup, tt.token.GetFirstGroup())
+			assert.Equal(t, tt.wantBackup, tt.token.GetBackupGroup())
 		})
 	}
 }

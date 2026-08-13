@@ -419,24 +419,40 @@ func TokenAuth() func(c *gin.Context) {
 
 		userGroup := userCache.Group
 		tokenGroup := token.GetFirstGroup()
-		if tokenGroup != "" {
-			// check common.UserUsableGroups[userGroup]
-			if _, ok := service.GetUserUsableGroups(userGroup)[tokenGroup]; !ok {
-				abortWithOpenAiMessage(c, http.StatusForbidden, fmt.Sprintf("无权访问 %s 分组", tokenGroup))
+		backupGroup := token.GetBackupGroup()
+		legacyBackup := strings.TrimSpace(token.BackupGroup) == "" && strings.HasPrefix(strings.TrimSpace(token.Group), "[")
+		usableGroups := service.GetUserUsableGroups(userGroup)
+		for index, group := range []string{tokenGroup, backupGroup} {
+			if group == "" {
+				continue
+			}
+			if _, ok := usableGroups[group]; !ok {
+				if index == 1 && legacyBackup {
+					backupGroup = ""
+					continue
+				}
+				abortWithOpenAiMessage(c, http.StatusForbidden, fmt.Sprintf("无权访问 %s 分组", group))
 				return
 			}
-			// check group in common.GroupRatio
-			if !ratio_setting.ContainsGroupRatio(tokenGroup) {
-				if tokenGroup != "auto" {
-					abortWithOpenAiMessage(c, http.StatusForbidden, fmt.Sprintf("分组 %s 已被弃用", tokenGroup))
-					return
+			if group != "auto" && !ratio_setting.ContainsGroupRatio(group) {
+				if index == 1 && legacyBackup {
+					backupGroup = ""
+					continue
 				}
+				abortWithOpenAiMessage(c, http.StatusForbidden, fmt.Sprintf("分组 %s 已被弃用", group))
+				return
 			}
-			userGroup = tokenGroup
 		}
-		common.SetContextKey(c, constant.ContextKeyUsingGroup, userGroup)
+		usingGroup := userGroup
+		if tokenGroup != "" {
+			usingGroup = tokenGroup
+		}
+		common.SetContextKey(c, constant.ContextKeyUsingGroup, usingGroup)
 
-		err = SetupContextForToken(c, token, parts...)
+		contextToken := *token
+		contextToken.Group = tokenGroup
+		contextToken.BackupGroup = backupGroup
+		err = SetupContextForToken(c, &contextToken, parts...)
 		if err != nil {
 			return
 		}
@@ -462,8 +478,8 @@ func SetupContextForToken(c *gin.Context, token *model.Token, parts ...string) e
 	} else {
 		c.Set("token_model_limit_enabled", false)
 	}
-	common.SetContextKey(c, constant.ContextKeyTokenGroup, token.Group)
-	common.SetContextKey(c, constant.ContextKeyTokenCrossGroupRetry, token.CrossGroupRetry)
+	common.SetContextKey(c, constant.ContextKeyTokenGroup, token.GetFirstGroup())
+	common.SetContextKey(c, constant.ContextKeyTokenBackupGroup, token.GetBackupGroup())
 	if len(parts) > 1 {
 		if model.IsAdmin(token.UserId) {
 			c.Set("specific_channel_id", parts[1])

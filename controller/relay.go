@@ -181,6 +181,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	retryParam := &service.RetryParam{
 		Ctx:         c,
 		TokenGroup:  relayInfo.TokenGroup,
+		BackupGroup: common.GetContextKeyString(c, constant.ContextKeyTokenBackupGroup),
 		ModelName:   relayInfo.OriginModelName,
 		RequestPath: c.Request.URL.Path,
 		Retry:       common.GetPointer(0),
@@ -231,9 +232,16 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
 
-		if !shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry()) {
-			break
+		remainingRetries := common.RetryTimes - retryParam.GetRetry()
+		if remainingRetries > 0 && shouldRetry(c, newAPIError, remainingRetries) {
+			continue
 		}
+		if retryParam.CanUseBackup() && shouldRetry(c, newAPIError, 1) {
+			retryParam.ActivateBackup()
+			retryParam.ResetRetryNextTry()
+			continue
+		}
+		break
 	}
 
 	useChannel := c.GetStringSlice("use_channel")
@@ -510,6 +518,7 @@ func RelayTask(c *gin.Context) {
 	retryParam := &service.RetryParam{
 		Ctx:         c,
 		TokenGroup:  relayInfo.TokenGroup,
+		BackupGroup: common.GetContextKeyString(c, constant.ContextKeyTokenBackupGroup),
 		ModelName:   relayInfo.OriginModelName,
 		RequestPath: c.Request.URL.Path,
 		Retry:       common.GetPointer(0),
@@ -560,9 +569,16 @@ func RelayTask(c *gin.Context) {
 				types.NewOpenAIError(taskErr.Error, types.ErrorCodeBadResponseStatusCode, taskErr.StatusCode))
 		}
 
-		if !shouldRetryTaskRelay(c, channel.Id, taskErr, common.RetryTimes-retryParam.GetRetry()) {
-			break
+		remainingRetries := common.RetryTimes - retryParam.GetRetry()
+		if remainingRetries > 0 && shouldRetryTaskRelay(c, channel.Id, taskErr, remainingRetries) {
+			continue
 		}
+		if retryParam.CanUseBackup() && shouldRetryTaskRelay(c, channel.Id, taskErr, 1) {
+			retryParam.ActivateBackup()
+			retryParam.ResetRetryNextTry()
+			continue
+		}
+		break
 	}
 
 	useChannel := c.GetStringSlice("use_channel")

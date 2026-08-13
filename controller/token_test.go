@@ -325,6 +325,9 @@ func runTokenMigrationCompatibilityTest(t *testing.T, db *gorm.DB, dialect strin
 	if migratedToken.Name != "legacy-token" {
 		t.Fatalf("expected migrated token name to be preserved, got %q", migratedToken.Name)
 	}
+	if migratedToken.BackupGroup != "" {
+		t.Fatalf("expected migrated token backup group to default to empty, got %q", migratedToken.BackupGroup)
+	}
 
 	inserted := model.Token{
 		UserId:             8,
