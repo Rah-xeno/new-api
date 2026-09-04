@@ -481,7 +481,7 @@ export function RechargeFormCard({
               )}
             </span>
             <a
-              href='https://pay.ldxp.cn/shop/XISCRAJ7'
+              href='https://wzyp.cn/shop/XISCRAJ7'
               target='_blank'
               rel='noopener noreferrer'
               className='inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground shrink-0'
