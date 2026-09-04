@@ -84,6 +84,7 @@ func TestAgentDistributionSchemaKeepsOldSQLNames(t *testing.T) {
 		"first_payment_at",
 		"first_payment_type",
 		"first_payment_trade_no",
+		"registration_ip",
 	} {
 		assert.True(t, migrator.HasColumn(&User{}, column), column)
 	}

@@ -154,6 +154,23 @@ func TestInsertKeepsBlankPasswordForPasswordlessUser(t *testing.T) {
 	assert.Empty(t, stored.Password)
 }
 
+func TestSearchUsersFindsRegistrationIP(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	users := []User{
+		{Username: "matching-ip", Password: "password", AffCode: "ip01", RegistrationIP: "203.0.113.7"},
+		{Username: "other-ip", Password: "password", AffCode: "ip02", RegistrationIP: "198.51.100.9"},
+	}
+	require.NoError(t, DB.Create(&users).Error)
+
+	matched, total, err := SearchUsers("203.0.113.7", "", nil, nil, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, matched, 1)
+	assert.Equal(t, int64(1), total)
+	assert.Equal(t, "matching-ip", matched[0].Username)
+	assert.Equal(t, "203.0.113.7", matched[0].RegistrationIP)
+}
+
 func TestInsertCountsInviteWhenLegacyInviterRewardIsDisabled(t *testing.T) {
 	setupUserUpdateTestState(t)
 

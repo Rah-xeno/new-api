@@ -3775,6 +3775,7 @@
     "Register Passkey": "Регистрация Passkey",
     "Registered a passkey": "Ключ доступа зарегистрирован",
     "Registration Enabled": "Регистрация включена",
+    "Registration IP": "IP регистрации",
     "Registry (optional)": "Реестр (необязательно)",
     "Registry secret": "Секрет реестра",
     "Registry username": "Имя пользователя реестра",

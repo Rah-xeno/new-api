@@ -363,6 +363,11 @@ export const getUsersColumns = ({
       render: renderTimestamp,
     },
     {
+      title: `${t('注册')} IP`,
+      dataIndex: 'registration_ip',
+      render: (text) => text || '-',
+    },
+    {
       title: t('最后登录'),
       dataIndex: 'last_login_at',
       render: renderTimestamp,

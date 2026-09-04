@@ -236,7 +236,7 @@ const RegisterForm = () => {
         }
         inputs.aff_code = affCode;
         const res = await API.post(
-          `/api/user/register?turnstile=${turnstileToken}`,
+          `/api/user/enroll?turnstile=${turnstileToken}`,
           inputs,
         );
         const { success, message } = res.data;

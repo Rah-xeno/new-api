@@ -60,6 +60,7 @@ type User struct {
 	LinuxDOId                string                     `json:"linux_do_id" gorm:"column:linux_do_id;index"`
 	Setting                  string                     `json:"setting" gorm:"type:text;column:setting"`
 	Remark                   string                     `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
+	RegistrationIP           string                     `json:"registration_ip" gorm:"type:varchar(45);column:registration_ip"`
 	StripeCustomer           string                     `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
 	CreatedAt                int64                      `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	LastLoginAt              int64                      `json:"last_login_at" gorm:"default:0;column:last_login_at"`
@@ -352,8 +353,8 @@ func SearchUsers(keyword string, group string, role *int, status *int, startIdx 
 	query := tx.Unscoped().Model(&User{})
 
 	// 构建搜索条件
-	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
-	likeArgs := []interface{}{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
+	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ? OR registration_ip LIKE ?"
+	likeArgs := []interface{}{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
 
 	// 尝试将关键字转换为整数ID
 	keywordInt, err := strconv.Atoi(keyword)

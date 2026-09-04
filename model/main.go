@@ -273,6 +273,9 @@ func migrateDB() error {
 	if err := migrateQuotaColumnsToBigint(); err != nil {
 		return err
 	}
+	if err := migrateUserRegistrationIP(); err != nil {
+		return err
+	}
 
 	if skip, err := shouldSkipLegacyAgentSQLiteAutoMigrate("users"); err != nil {
 		return err
@@ -344,6 +347,9 @@ func migrateDB() error {
 
 func migrateDBFast() error {
 	if err := migrateQuotaColumnsToBigint(); err != nil {
+		return err
+	}
+	if err := migrateUserRegistrationIP(); err != nil {
 		return err
 	}
 
@@ -434,6 +440,16 @@ func migrateDBFast() error {
 	}
 	common.SysLog("database migrated")
 	return nil
+}
+
+// migrateUserRegistrationIP adds the column before the full User migration so
+// legacy SQLite schemas that cannot be parsed by GORM still receive it.
+func migrateUserRegistrationIP() error {
+	migrator := DB.Migrator()
+	if !migrator.HasTable(&User{}) || migrator.HasColumn(&User{}, "registration_ip") {
+		return nil
+	}
+	return migrator.AddColumn(&User{}, "RegistrationIP")
 }
 
 // shouldSkipLegacyAgentSQLiteAutoMigrate detects tables created by the old
