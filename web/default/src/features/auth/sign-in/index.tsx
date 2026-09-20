@@ -25,25 +25,30 @@ import { AuthLayout } from '../auth-layout'
 import { TermsFooter } from '../components/terms-footer'
 import { UserAuthForm } from './components/user-auth-form'
 
+import '@/styles/scaling-auth.css'
+
 export function SignIn() {
   const { t } = useTranslation()
   const { redirect } = useSearch({ from: '/(auth)/sign-in' })
   const { status } = useStatus()
 
   return (
-    <AuthLayout>
-      <div className='w-full space-y-8'>
-        <div className='space-y-2'>
-          <h2 className='text-center text-2xl font-semibold tracking-tight sm:text-left'>
-            {t('Sign in')}
-          </h2>
+    <AuthLayout variant='scaling'>
+      <div className='scaling-sign-in w-full'>
+        <div className='scaling-auth-heading'>
+          <p className='scaling-auth-kicker'>
+            <span aria-hidden='true'>01 /</span>
+            {t('Secure access')}
+          </p>
+          <h2 className='scaling-auth-title'>{t('Sign in')}</h2>
           {!status?.self_use_mode_enabled &&
             status?.register_enabled !== false && (
-              <p className='text-muted-foreground text-left text-sm sm:text-base'>
+              <p className='scaling-auth-subtitle'>
                 {t("Don't have an account?")}{' '}
                 <Link
                   to='/sign-up'
-                  className='hover:text-primary font-medium underline underline-offset-4'
+                  viewTransition
+                  className='scaling-auth-inline-link'
                 >
                   {t('Sign up')}
                 </Link>
@@ -52,12 +57,15 @@ export function SignIn() {
             )}
         </div>
 
-        <UserAuthForm redirectTo={redirect} />
+        <UserAuthForm
+          className='scaling-auth-form-fields'
+          redirectTo={redirect}
+        />
 
         <TermsFooter
           variant='sign-in'
           status={status}
-          className='text-center'
+          className='scaling-auth-terms'
         />
       </div>
     </AuthLayout>

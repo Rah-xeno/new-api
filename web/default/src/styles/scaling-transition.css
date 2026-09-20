@@ -1,0 +1,144 @@
+/* The sphere stays shared; a brief defocus softens its change of position/crop. */
+.scaling-home .hero-art,
+.scaling-auth-layout > .scaling-auth-visual {
+  view-transition-name: scaling-sphere;
+}
+
+.scaling-home .hero-copy {
+  view-transition-name: scaling-copy;
+}
+
+.scaling-auth-layout .scaling-auth-form-shell {
+  view-transition-name: scaling-login;
+}
+
+:root:has(.scaling-home, .scaling-auth-layout)::view-transition {
+  background: #f4f6f1;
+}
+
+:root:has(.scaling-home, .scaling-auth-layout)::view-transition-old(root) {
+  animation: scaling-fade-out 260ms both ease-out;
+}
+
+:root:has(.scaling-home, .scaling-auth-layout)::view-transition-new(root) {
+  animation: scaling-fade-in 560ms 180ms both ease-out;
+}
+
+::view-transition-group(scaling-sphere) {
+  animation-duration: 820ms;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.2, 1);
+}
+
+::view-transition-image-pair(scaling-sphere) {
+  animation: scaling-sphere-defocus 820ms both ease-in-out;
+}
+
+::view-transition-old(scaling-sphere),
+::view-transition-new(scaling-sphere) {
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(scaling-sphere) {
+  animation: scaling-fade-out 500ms both ease-in-out;
+}
+
+::view-transition-new(scaling-sphere) {
+  animation: scaling-fade-in 640ms 180ms both ease-in-out;
+}
+
+::view-transition-new(scaling-login),
+::view-transition-new(scaling-copy) {
+  animation: scaling-content-enter 580ms 240ms both
+    cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(scaling-login),
+::view-transition-old(scaling-copy) {
+  animation: scaling-content-exit 260ms both ease-out;
+}
+
+@keyframes scaling-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaling-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes scaling-sphere-defocus {
+  0%,
+  100% {
+    filter: blur(0);
+    opacity: 1;
+  }
+  45% {
+    filter: blur(var(--scaling-scene-blur, 8px));
+    opacity: 0.72;
+  }
+}
+
+@keyframes scaling-content-enter {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaling-content-exit {
+  to {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(-6px);
+  }
+}
+
+/* Unsupported browsers still navigate in place, with a lightweight reveal. */
+.scaling-auth-fallback .scaling-auth-form-shell {
+  animation: scaling-content-enter 420ms both ease-out;
+}
+
+@media (max-width: 700px) {
+  ::view-transition-group(scaling-sphere),
+  ::view-transition-image-pair(scaling-sphere) {
+    animation-duration: 620ms;
+  }
+  ::view-transition-new(scaling-sphere),
+  ::view-transition-new(scaling-login),
+  ::view-transition-new(scaling-copy),
+  :root:has(.scaling-home, .scaling-auth-layout)::view-transition-new(root) {
+    animation-duration: 460ms;
+    animation-delay: 160ms;
+  }
+  ::view-transition-image-pair(scaling-sphere) {
+    --scaling-scene-blur: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:has(.scaling-home, .scaling-auth-layout)::view-transition-group(*),
+  :root:has(.scaling-home, .scaling-auth-layout)::view-transition-image-pair(*),
+  :root:has(.scaling-home, .scaling-auth-layout)::view-transition-old(*),
+  :root:has(.scaling-home, .scaling-auth-layout)::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    filter: none !important;
+  }
+  .scaling-auth-layout .scaling-auth-form-shell {
+    animation: none;
+  }
+}

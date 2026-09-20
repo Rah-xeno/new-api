@@ -16,9 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { formatCurrencyFromUSD } from '@/lib/currency'
+import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 
-import { QUOTA_TYPE_VALUES, TOKEN_UNIT_DIVISORS } from '../constants'
+import {
+  FILTER_ALL,
+  QUOTA_TYPE_VALUES,
+  TOKEN_UNIT_DIVISORS,
+} from '../constants'
 import type { PricingModel, TokenUnit, PriceType } from '../types'
 import { getConfiguredGroupRatio, getDisplayGroupRatio } from './model-helpers'
 
@@ -102,13 +106,70 @@ function hasRatio(value: number | null | undefined): boolean {
   return value !== undefined && value !== null && Number.isFinite(Number(value))
 }
 
+function getFixedOverride(
+  model: PricingModel,
+  group?: string
+): number | undefined {
+  if (model.quota_type !== QUOTA_TYPE_VALUES.REQUEST) return undefined
+  const value =
+    group && group !== FILTER_ALL
+      ? model.fixed_price_overrides?.[group]?.price
+      : undefined
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function getDisplayedFixedPrice(
+  model: PricingModel,
+  selectedGroup?: string
+): number {
+  const selected = getFixedOverride(model, selectedGroup)
+  if (selected !== undefined) return selected
+
+  const base = model.model_price || 0
+  if (selectedGroup && selectedGroup !== FILTER_ALL) {
+    return (
+      base *
+      (model.uniform_group_price
+        ? 1
+        : getDisplayGroupRatio(model, selectedGroup))
+    )
+  }
+  const groups = model.enable_groups.filter((group) => group !== FILTER_ALL)
+  const fallbackGroups = Object.keys(model.fixed_price_overrides ?? {})
+  const candidateGroups = groups.length > 0 ? groups : fallbackGroups
+  if (candidateGroups.length === 0) {
+    return (
+      base *
+      (model.uniform_group_price
+        ? 1
+        : getDisplayGroupRatio(model, selectedGroup))
+    )
+  }
+
+  let best = Number.POSITIVE_INFINITY
+  for (const group of candidateGroups) {
+    const override = getFixedOverride(model, group)
+    const price =
+      override ??
+      base *
+        (model.uniform_group_price ? 1 : getDisplayGroupRatio(model, group))
+    best = Math.min(best, price)
+  }
+  return Number.isFinite(best)
+    ? best
+    : base *
+        (model.uniform_group_price
+          ? 1
+          : getDisplayGroupRatio(model, selectedGroup))
+}
+
 /**
  * Apply recharge rate to price
  *
  * priceRate represents how much users need to recharge (in the display currency)
  * to get 1 USD credit. usdExchangeRate is the real exchange rate.
  *
- * The returned value will be formatted by formatCurrencyFromUSD, which will
+ * The returned value will be formatted by formatBillingCurrencyFromUSD, which will
  * multiply by the display currency's exchange rate.
  *
  * Examples:
@@ -118,14 +179,14 @@ function hasRatio(value: number | null | undefined): boolean {
  *    - priceRate = 0.5 (recharge $0.5 to get $1 credit)
  *    - usdExchangeRate = 1
  *    - Return: 1 × 0.5 / 1 = 0.5
- *    - formatCurrencyFromUSD(0.5) → $0.5 ✓
+ *    - formatBillingCurrencyFromUSD(0.5) → $0.5 ✓
  *
  * 2. Display currency = CNY:
  *    - Model: 1 USD
  *    - priceRate = 4 (recharge ¥4 to get $1 credit)
  *    - usdExchangeRate = 7 (real rate: 1 USD = ¥7)
  *    - Return: 1 × 4 / 7 = 0.571
- *    - formatCurrencyFromUSD(0.571) → 0.571 × 7 = ¥4 ✓
+ *    - formatBillingCurrencyFromUSD(0.571) → 0.571 × 7 = ¥4 ✓
  *    - Normal price: ¥7, Recharge price: ¥4 (cheaper!)
  */
 function applyRechargeRate(
@@ -148,7 +209,8 @@ export function formatPrice(
   showWithRecharge = false,
   priceRate = 1,
   usdExchangeRate = 1,
-  selectedGroup?: string
+  selectedGroup?: string,
+  showCurrencySymbol = true
 ): string {
   if (model.quota_type === QUOTA_TYPE_VALUES.REQUEST) {
     return '-'
@@ -165,7 +227,8 @@ export function formatPrice(
   )
 
   const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
-  return formatCurrencyFromUSD(price, {
+  return formatBillingCurrencyFromUSD(price, {
+    showSymbol: showCurrencySymbol,
     digitsLarge: 4,
     digitsSmall: 6,
     abbreviate: false,
@@ -200,7 +263,7 @@ export function formatGroupPrice(
   )
 
   const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
-  return formatCurrencyFromUSD(price, {
+  return formatBillingCurrencyFromUSD(price, {
     digitsLarge: 4,
     digitsSmall: 6,
     abbreviate: false,
@@ -222,8 +285,11 @@ export function formatFixedPrice(
     return '-'
   }
 
-  const ratio = getConfiguredGroupRatio(groupRatio, group)
-  let priceInUSD = (model.model_price || 0) * ratio
+  const override = getFixedOverride(model, group)
+  const ratio = model.uniform_group_price
+    ? 1
+    : getConfiguredGroupRatio(groupRatio, group)
+  let priceInUSD = override ?? (model.model_price || 0) * ratio
 
   priceInUSD = applyRechargeRate(
     priceInUSD,
@@ -232,7 +298,7 @@ export function formatFixedPrice(
     usdExchangeRate
   )
 
-  return formatCurrencyFromUSD(priceInUSD, {
+  return formatBillingCurrencyFromUSD(priceInUSD, {
     digitsLarge: 4,
     digitsSmall: 4,
     abbreviate: false,
@@ -247,15 +313,14 @@ export function formatRequestPrice(
   showWithRecharge = false,
   priceRate = 1,
   usdExchangeRate = 1,
-  selectedGroup?: string
+  selectedGroup?: string,
+  showCurrencySymbol = true
 ): string {
   if (model.quota_type !== QUOTA_TYPE_VALUES.REQUEST) {
     return '-'
   }
 
-  const displayGroupRatio = getDisplayGroupRatio(model, selectedGroup)
-
-  let priceInUSD = (model.model_price || 0) * displayGroupRatio
+  let priceInUSD = getDisplayedFixedPrice(model, selectedGroup)
 
   priceInUSD = applyRechargeRate(
     priceInUSD,
@@ -264,7 +329,8 @@ export function formatRequestPrice(
     usdExchangeRate
   )
 
-  return formatCurrencyFromUSD(priceInUSD, {
+  return formatBillingCurrencyFromUSD(priceInUSD, {
+    showSymbol: showCurrencySymbol,
     digitsLarge: 4,
     digitsSmall: 4,
     abbreviate: false,

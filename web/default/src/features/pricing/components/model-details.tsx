@@ -38,6 +38,7 @@ import { StaticDataTable } from '@/components/data-table'
 import { sideDrawerContentClassName } from '@/components/drawer-layout'
 import { GroupBadge } from '@/components/group-badge'
 import { PublicLayout } from '@/components/layout'
+import { QuotaText } from '@/components/quota-amount'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -57,28 +58,49 @@ import {
 } from '@/features/performance-metrics/lib/format'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { DEFAULT_TOKEN_UNIT } from '../constants'
 import { usePricingData } from '../hooks/use-pricing-data'
+import type { ParsedTaskTier } from '../lib/billing-expr'
 import {
+  formatTaskUsageUnitPrice,
   getDynamicPriceEntries,
+  getDynamicPriceUnitLabelKey,
   getDynamicPricingSummary,
   getDynamicPricingTiers,
+  getTaskUsageQuantityUnitLabelKey,
   isDynamicPricingModel,
+  isUnconfiguredTaskUsageModel,
+  type DynamicPriceEntry,
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
 import { getAvailableGroups, isTokenBasedModel } from '../lib/model-helpers'
 import { formatFixedPrice, formatGroupPrice } from '../lib/price'
+import {
+  evaluateTaskUsageExamples,
+  getTaskEnumFields,
+  getTaskNumberFields,
+} from '../lib/task-expr'
+import { getTaskPricingDisplayTiers } from '../lib/task-matrix-display'
+import {
+  hasSimpleTaskPricing,
+  taskPriceLabel,
+  taskPricingConditions,
+} from '../lib/task-price-display'
 import type {
   ModelCapability,
   PriceType,
   PricingModel,
+  PricingData,
   TokenUnit,
 } from '../types'
 import { DynamicPricingBreakdown } from './dynamic-pricing-breakdown'
+import { MinimaxH3DocsButton } from './minimax-h3-docs'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelDetailsApi } from './model-details-api'
 import { ModelDetailsPerformance } from './model-details-performance'
+import { SeedanceDocsButton } from './seedance-docs'
 
 // ----------------------------------------------------------------------------
 // Local UI helpers
@@ -89,6 +111,68 @@ function SectionTitle(props: { children: React.ReactNode }) {
     <h2 className='text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase'>
       {props.children}
     </h2>
+  )
+}
+
+function DynamicPriceEntryLabel(props: { entry: DynamicPriceEntry }) {
+  const { t, i18n } = useTranslation()
+  if (props.entry.labelKind === 'schema') {
+    return (
+      <span className='break-words whitespace-normal'>
+        {taskPriceLabel(
+          props.entry.description,
+          props.entry.shortLabel,
+          i18n.language
+        )}
+      </span>
+    )
+  }
+  return t(props.entry.shortLabel)
+}
+
+function UnconfiguredTaskPricingNotice(props: { model: PricingModel }) {
+  const { t } = useTranslation()
+  const numberFields = getTaskNumberFields(props.model.billing_usage_schema)
+  const enumFields = getTaskEnumFields(props.model.billing_usage_schema)
+
+  return (
+    <div className='bg-muted/20 flex flex-col gap-3 rounded-lg border p-3'>
+      <p className='text-muted-foreground text-sm'>
+        {t(
+          'This model is billed by usage, but the administrator has not configured its pricing yet.'
+        )}
+      </p>
+      {numberFields.length + enumFields.length > 0 ? (
+        <dl className='grid gap-2 sm:grid-cols-2'>
+          {numberFields.map(([field, definition]) => (
+            <div
+              key={field}
+              className='flex items-baseline justify-between gap-3'
+            >
+              <dt className='text-sm'>
+                <code>{field}</code>
+              </dt>
+              <dd className='text-muted-foreground text-xs'>
+                {t(getTaskUsageQuantityUnitLabelKey(definition.unit))}
+              </dd>
+            </div>
+          ))}
+          {enumFields.map(([field, definition]) => (
+            <div
+              key={field}
+              className='flex items-baseline justify-between gap-3'
+            >
+              <dt className='text-sm'>
+                <code>{field}</code>
+              </dt>
+              <dd className='text-muted-foreground text-right text-xs'>
+                {(definition.enum ?? []).join(', ')}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </div>
   )
 }
 
@@ -558,6 +642,10 @@ function ModelHeader(props: { model: PricingModel }) {
           {description}
         </p>
       )}
+      <div className='mt-3 empty:hidden'>
+        <MinimaxH3DocsButton modelName={model.model_name} />
+        <SeedanceDocsButton modelName={model.model_name} />
+      </div>
     </header>
   )
 }
@@ -653,23 +741,31 @@ function PriceSection(props: {
       <section>
         <SectionTitle>{t('Base Price')}</SectionTitle>
         {dynamicSummary.primaryEntries.length > 0 ? (
-          <div className='grid grid-cols-2 gap-2'>
-            {dynamicSummary.primaryEntries.map((entry) => (
-              <div
-                key={entry.key}
-                className='bg-muted/20 rounded-lg border p-3'
-              >
-                <div className='text-muted-foreground text-xs'>
-                  {t(entry.shortLabel)}
+          <div
+            className={cn(
+              'grid gap-2',
+              dynamicSummary.primaryEntries.length > 1 && 'grid-cols-2'
+            )}
+          >
+            {dynamicSummary.primaryEntries.map((entry) => {
+              const unitLabelKey = getDynamicPriceUnitLabelKey(entry)
+              return (
+                <div
+                  key={entry.key}
+                  className='bg-muted/20 rounded-lg border p-3'
+                >
+                  <div className='text-muted-foreground text-xs'>
+                    <DynamicPriceEntryLabel entry={entry} />
+                  </div>
+                  <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
+                    <QuotaText>{entry.formatted}</QuotaText>
+                    <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
+                      / {unitLabelKey ? t(unitLabelKey) : tokenUnitLabel}
+                    </span>
+                  </div>
                 </div>
-                <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
-                  {entry.formatted}
-                  <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-                    / {tokenUnitLabel}
-                  </span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : (
           <p className='text-muted-foreground text-sm'>
@@ -679,25 +775,37 @@ function PriceSection(props: {
         {dynamicSummary.secondaryEntries.length > 0 && (
           <div className='bg-muted/20 mt-3 rounded-lg border px-3 py-2.5'>
             <div className='space-y-1.5'>
-              {dynamicSummary.secondaryEntries.map((entry) => (
-                <div
-                  key={entry.key}
-                  className='flex items-baseline justify-between gap-4'
-                >
-                  <span className='text-muted-foreground/70 text-sm'>
-                    {t(entry.shortLabel)}
-                  </span>
-                  <span className='text-muted-foreground font-mono text-sm tabular-nums'>
-                    {entry.formatted}
-                    <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-                      / {tokenUnitLabel}
+              {dynamicSummary.secondaryEntries.map((entry) => {
+                const unitLabelKey = getDynamicPriceUnitLabelKey(entry)
+                return (
+                  <div
+                    key={entry.key}
+                    className='flex items-baseline justify-between gap-4'
+                  >
+                    <span className='text-muted-foreground/70 text-sm'>
+                      <DynamicPriceEntryLabel entry={entry} />
                     </span>
-                  </span>
-                </div>
-              ))}
+                    <span className='text-muted-foreground font-mono text-sm tabular-nums'>
+                      <QuotaText>{entry.formatted}</QuotaText>
+                      <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
+                        / {unitLabelKey ? t(unitLabelKey) : tokenUnitLabel}
+                      </span>
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
+      </section>
+    )
+  }
+
+  if (isUnconfiguredTaskUsageModel(props.model)) {
+    return (
+      <section>
+        <SectionTitle>{t('Base Price')}</SectionTitle>
+        <UnconfiguredTaskPricingNotice model={props.model} />
       </section>
     )
   }
@@ -711,14 +819,16 @@ function PriceSection(props: {
             {t('Per request')}
           </span>
           <span className='text-foreground font-mono text-sm font-semibold tabular-nums'>
-            {formatFixedPrice(
-              props.model,
-              baseGroupKey,
-              props.showRechargePrice,
-              props.priceRate,
-              props.usdExchangeRate,
-              baseGroupRatioMap
-            )}
+            <QuotaText>
+              {formatFixedPrice(
+                props.model,
+                baseGroupKey,
+                props.showRechargePrice,
+                props.priceRate,
+                props.usdExchangeRate,
+                baseGroupRatioMap
+              )}
+            </QuotaText>
           </span>
         </div>
       </section>
@@ -728,16 +838,18 @@ function PriceSection(props: {
   const secondaryItems = secondaryPriceTypes.filter((p) => p.available)
   const renderPrice = (type: PriceType) => (
     <>
-      {formatGroupPrice(
-        props.model,
-        baseGroupKey,
-        type,
-        props.tokenUnit,
-        props.showRechargePrice,
-        props.priceRate,
-        props.usdExchangeRate,
-        baseGroupRatioMap
-      )}
+      <QuotaText>
+        {formatGroupPrice(
+          props.model,
+          baseGroupKey,
+          type,
+          props.tokenUnit,
+          props.showRechargePrice,
+          props.priceRate,
+          props.usdExchangeRate,
+          baseGroupRatioMap
+        )}
+      </QuotaText>
       <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
         / {tokenUnitLabel}
       </span>
@@ -852,14 +964,14 @@ function getDynamicFormattedPricesByTier(
 function GroupPricingSection(props: {
   model: PricingModel
   groupRatio: Record<string, number>
-  usableGroup: Record<string, { desc: string; ratio: number }>
+  usableGroup: PricingData['usable_group']
   autoGroups: string[]
   priceRate: number
   usdExchangeRate: number
   tokenUnit: TokenUnit
   showRechargePrice?: boolean
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const showRechargePrice = props.showRechargePrice ?? false
 
   const availableGroups = useMemo(
@@ -907,11 +1019,18 @@ function GroupPricingSection(props: {
     )
   }
 
-  const thClass =
-    'text-muted-foreground py-2 text-[10px] font-medium tracking-wider uppercase'
+  const thClass = cn(
+    'text-muted-foreground py-2 text-xs font-medium whitespace-normal break-words',
+    !props.model.billing_usage_schema && 'tracking-wider uppercase'
+  )
 
   if (isDynamicPricingModel(props.model)) {
-    const dynamicTiers = getDynamicPricingTiers(props.model)
+    const dynamicTiers = props.model.billing_usage_schema
+      ? getTaskPricingDisplayTiers(
+          props.model.billing_expr,
+          props.model.billing_usage_schema
+        )
+      : getDynamicPricingTiers(props.model)
 
     if (dynamicTiers.length === 0) {
       return (
@@ -940,16 +1059,22 @@ function GroupPricingSection(props: {
       )
     }
 
+    const usageExampleRows = evaluateTaskUsageExamples(
+      props.model.billing_expr,
+      props.model.billing_usage_schema,
+      props.model.billing_usage_examples
+    )
     const priceFields = getDynamicPriceFields(dynamicTiers, {
       tokenUnit: props.tokenUnit,
       showRechargePrice,
       priceRate: props.priceRate,
       usdExchangeRate: props.usdExchangeRate,
       groupRatioMultiplier: 1,
+      usageSchema: props.model.billing_usage_schema,
     })
     const formattedPricesByGroup = new Map(
       availableGroups.map((group) => {
-        const ratio = props.groupRatio[group] || 1
+        const ratio = props.groupRatio[group] ?? 1
         return [
           group,
           getDynamicFormattedPricesByTier(dynamicTiers, {
@@ -958,6 +1083,7 @@ function GroupPricingSection(props: {
             priceRate: props.priceRate,
             usdExchangeRate: props.usdExchangeRate,
             groupRatioMultiplier: ratio,
+            usageSchema: props.model.billing_usage_schema,
           }),
         ] as const
       })
@@ -969,7 +1095,7 @@ function GroupPricingSection(props: {
         <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
         <div className='space-y-3'>
           {availableGroups.map((group) => {
-            const ratio = props.groupRatio[group] || 1
+            const ratio = props.groupRatio[group] ?? 1
             const formattedPricesByTier =
               formattedPricesByGroup.get(group) ??
               new Map<DynamicPricingTier, Map<string, string>>()
@@ -991,56 +1117,158 @@ function GroupPricingSection(props: {
                     `${group}-${tier.label || tierIndex}`
                   }
                   columns={[
-                    {
-                      id: 'tier',
-                      header: t('Tier'),
-                      className: thClass,
-                      cellClassName: 'text-muted-foreground py-2.5',
-                      cell: (tier) => tier.label || t('Default'),
-                    },
-                    ...priceFields.map((fieldEntry) => ({
-                      id: fieldEntry.field,
-                      header: t(fieldEntry.shortLabel),
-                      className: `${thClass} text-right`,
-                      cellClassName: 'py-2.5 text-right font-mono',
-                      cell: (tier: (typeof dynamicTiers)[number]) =>
-                        formattedPricesByTier
-                          .get(tier)
-                          ?.get(fieldEntry.field) ?? '-',
-                    })),
+                    ...(hasSimpleTaskPricing(props.model)
+                      ? []
+                      : [
+                          {
+                            id: 'tier',
+                            header: props.model.billing_usage_schema
+                              ? t('Applicable conditions')
+                              : t('Tier'),
+                            className: thClass,
+                            cellClassName:
+                              'text-muted-foreground py-2.5 whitespace-normal break-words',
+                            cell: (tier: DynamicPricingTier) =>
+                              'unitPrices' in tier
+                                ? taskPricingConditions(
+                                    (tier as ParsedTaskTier).conditions,
+                                    props.model.billing_usage_schema,
+                                    i18n.language,
+                                    t
+                                  ) ||
+                                  t(
+                                    dynamicTiers.length > 1
+                                      ? 'Other cases'
+                                      : 'All requests'
+                                  )
+                                : tier.label || t('Default'),
+                          },
+                        ]),
+                    ...priceFields.map((fieldEntry) => {
+                      const unitLabelKey =
+                        getDynamicPriceUnitLabelKey(fieldEntry)
+                      const fieldLabel =
+                        fieldEntry.labelKind === 'schema' ? (
+                          <DynamicPriceEntryLabel entry={fieldEntry} />
+                        ) : (
+                          t(fieldEntry.shortLabel)
+                        )
+                      return {
+                        id: fieldEntry.field,
+                        header: unitLabelKey ? (
+                          <>
+                            {fieldLabel}
+                            {` / ${t(unitLabelKey)}`}
+                          </>
+                        ) : (
+                          fieldLabel
+                        ),
+                        className: `${thClass} text-right`,
+                        cellClassName: 'py-2.5 text-right font-mono',
+                        cell: (tier: (typeof dynamicTiers)[number]) => (
+                          <QuotaText>
+                            {formattedPricesByTier
+                              .get(tier)
+                              ?.get(fieldEntry.field) ?? '-'}
+                          </QuotaText>
+                        ),
+                      }
+                    }),
                   ]}
                 />
+                {usageExampleRows.length > 0 ? (
+                  <div className='border-t'>
+                    <div className='text-muted-foreground px-3 pt-2 text-[10px] font-medium tracking-wider uppercase'>
+                      {t('Price examples')}
+                    </div>
+                    <StaticDataTable
+                      className='rounded-none border-0'
+                      tableClassName='text-sm'
+                      headerRowClassName='hover:bg-transparent'
+                      data={usageExampleRows}
+                      getRowKey={(row) => `${group}-${row.label}`}
+                      columns={[
+                        {
+                          id: 'spec',
+                          header: t('Spec'),
+                          className: thClass,
+                          cellClassName: 'text-muted-foreground py-2.5',
+                          cell: (row) => row.label,
+                        },
+                        {
+                          id: 'price',
+                          header: t('Example price'),
+                          className: `${thClass} text-right`,
+                          cellClassName: 'py-2.5 text-right font-mono',
+                          cell: (row) => (
+                            <QuotaText>{`≈ ${formatTaskUsageUnitPrice(
+                              row.total,
+                              {
+                                tokenUnit: props.tokenUnit,
+                                showRechargePrice,
+                                priceRate: props.priceRate,
+                                usdExchangeRate: props.usdExchangeRate,
+                                groupRatioMultiplier: ratio,
+                              }
+                            )}`}</QuotaText>
+                          ),
+                        },
+                      ]}
+                    />
+                    <p className='text-muted-foreground/40 px-3 pb-2 text-[10px]'>
+                      {t('Approximate prices for common specs.')}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             )
           })}
           <p className='text-muted-foreground/40 mt-1.5 text-[10px]'>
-            {t('Prices shown per')} {tokenUnitLabel} tokens
+            {dynamicTiers.some((tier) => 'unitPrices' in tier)
+              ? t('Prices shown per usage unit')
+              : `${t('Prices shown per')} ${tokenUnitLabel} tokens`}
           </p>
         </div>
       </section>
     )
   }
 
-  const renderGroupPrice = (group: string, type: PriceType) =>
-    formatGroupPrice(
-      props.model,
-      group,
-      type,
-      props.tokenUnit,
-      showRechargePrice,
-      props.priceRate,
-      props.usdExchangeRate,
-      props.groupRatio
+  if (isUnconfiguredTaskUsageModel(props.model)) {
+    return (
+      <section>
+        <SectionTitle>{t('Pricing by Group')}</SectionTitle>
+        <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
+        <UnconfiguredTaskPricingNotice model={props.model} />
+      </section>
     )
-  const renderFixedGroupPrice = (group: string) =>
-    formatFixedPrice(
-      props.model,
-      group,
-      showRechargePrice,
-      props.priceRate,
-      props.usdExchangeRate,
-      props.groupRatio
-    )
+  }
+
+  const renderGroupPrice = (group: string, type: PriceType) => (
+    <QuotaText>
+      {formatGroupPrice(
+        props.model,
+        group,
+        type,
+        props.tokenUnit,
+        showRechargePrice,
+        props.priceRate,
+        props.usdExchangeRate,
+        props.groupRatio
+      )}
+    </QuotaText>
+  )
+  const renderFixedGroupPrice = (group: string) => (
+    <QuotaText>
+      {formatFixedPrice(
+        props.model,
+        group,
+        showRechargePrice,
+        props.priceRate,
+        props.usdExchangeRate,
+        props.groupRatio
+      )}
+    </QuotaText>
+  )
 
   return (
     <section>
@@ -1065,7 +1293,7 @@ function GroupPricingSection(props: {
             header: t('Ratio'),
             className: thClass,
             cellClassName: 'text-muted-foreground py-2.5 font-mono',
-            cell: (group) => `${props.groupRatio[group] || 1}x`,
+            cell: (group) => `${props.groupRatio[group] ?? 1}x`,
           },
           ...(isTokenBased
             ? [
@@ -1128,7 +1356,7 @@ const TAB_META: Record<
 export interface ModelDetailsContentProps {
   model: PricingModel
   groupRatio: Record<string, number>
-  usableGroup: Record<string, { desc: string; ratio: number }>
+  usableGroup: PricingData['usable_group']
   endpointMap: Record<string, { path?: string; method?: string }>
   autoGroups: string[]
   priceRate: number
@@ -1138,12 +1366,23 @@ export interface ModelDetailsContentProps {
 }
 
 export function ModelDetailsContent(props: ModelDetailsContentProps) {
+  useSystemConfigStore((state) => state.config.currency)
   const { t } = useTranslation()
   const showRechargePrice = props.showRechargePrice ?? false
 
   const isDynamic =
     props.model.billing_mode === 'tiered_expr' &&
     Boolean(props.model.billing_expr)
+
+  const simpleTaskPricing = hasSimpleTaskPricing(props.model)
+  const taskTiers = getTaskPricingDisplayTiers(
+    props.model.billing_expr,
+    props.model.billing_usage_schema
+  )
+  const showBasePrices =
+    !props.model.billing_usage_schema ||
+    simpleTaskPricing ||
+    taskTiers.length === 0
 
   return (
     <div className='@container/details space-y-4'>
@@ -1171,15 +1410,25 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
 
           <section className='bg-card/60 space-y-5 rounded-xl border p-4 shadow-sm'>
             <SectionTitle>{t('Pricing')}</SectionTitle>
-            <PriceSection
-              model={props.model}
-              priceRate={props.priceRate}
-              usdExchangeRate={props.usdExchangeRate}
-              tokenUnit={props.tokenUnit}
-              showRechargePrice={showRechargePrice}
-            />
-            {isDynamic && (
-              <DynamicPricingBreakdown billingExpr={props.model.billing_expr} />
+            {showBasePrices && (
+              <PriceSection
+                model={props.model}
+                priceRate={props.priceRate}
+                usdExchangeRate={props.usdExchangeRate}
+                tokenUnit={props.tokenUnit}
+                showRechargePrice={showRechargePrice}
+              />
+            )}
+            {isDynamic && !simpleTaskPricing && (
+              <DynamicPricingBreakdown
+                billingExpr={props.model.billing_expr}
+                usageSchema={props.model.billing_usage_schema}
+                taskPriceOptions={{
+                  showRechargePrice,
+                  priceRate: props.priceRate,
+                  usdExchangeRate: props.usdExchangeRate,
+                }}
+              />
             )}
             <GroupPricingSection
               model={props.model}
@@ -1216,20 +1465,24 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
 // ----------------------------------------------------------------------------
 
 export interface ModelDetailsDrawerProps extends ModelDetailsContentProps {
+  catalog?: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
 export function ModelDetailsDrawer(props: ModelDetailsDrawerProps) {
   const { t } = useTranslation()
-  const { open, onOpenChange, ...contentProps } = props
+  const { open, onOpenChange, catalog, ...contentProps } = props
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side='right'
-        className={sideDrawerContentClassName(
-          'sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl'
+        className={cn(
+          sideDrawerContentClassName(
+            'sm:max-w-xl lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl'
+          ),
+          catalog && 'pricing-model-drawer'
         )}
       >
         <SheetHeader className='sr-only'>

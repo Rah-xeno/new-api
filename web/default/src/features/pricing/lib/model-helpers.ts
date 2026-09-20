@@ -17,26 +17,55 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { EXCLUDED_GROUPS, FILTER_ALL, QUOTA_TYPE_VALUES } from '../constants'
-import type { PricingModel } from '../types'
+import type { PricingModel, UsableGroup } from '../types'
 
 // ----------------------------------------------------------------------------
 // Model Helper Utilities
 // ----------------------------------------------------------------------------
 
-/**
- * Get available groups for a model
- */
+type UsableGroupInput =
+  | UsableGroup
+  | Record<string, { desc?: string; ratio?: number }>
+
+function usableGroupNames(usableGroup?: UsableGroupInput): string[] {
+  return Object.keys(usableGroup ?? {}).filter(
+    (group) => !EXCLUDED_GROUPS.includes(group)
+  )
+}
+
+/** Normalize backend model membership to the concrete groups visible to users. */
+export function normalizeModelGroups(
+  model: PricingModel,
+  usableGroup?: UsableGroupInput
+): string[] {
+  const enabled = Array.isArray(model.enable_groups) ? model.enable_groups : []
+  const visible = usableGroupNames(usableGroup)
+  const candidates = enabled.includes('all') ? visible : enabled
+  const visibleSet = new Set(visible)
+  const seen = new Set<string>()
+
+  return candidates.filter((group) => {
+    if (EXCLUDED_GROUPS.includes(group) || seen.has(group)) return false
+    if (usableGroup && !visibleSet.has(group)) return false
+    seen.add(group)
+    return true
+  })
+}
+
+/** Groups a model can show in the catalog, already intersected with access. */
+export function getModelDisplayGroups(
+  model: PricingModel,
+  usableGroup?: UsableGroupInput
+): string[] {
+  return normalizeModelGroups(model, usableGroup)
+}
+
+/** Backwards-compatible name used by the model details drawer. */
 export function getAvailableGroups(
   model: PricingModel,
-  usableGroup: Record<string, { desc: string; ratio: number }>
+  usableGroup: UsableGroupInput
 ): string[] {
-  const modelEnableGroups = Array.isArray(model.enable_groups)
-    ? model.enable_groups
-    : []
-
-  return Object.keys(usableGroup)
-    .filter((g) => !EXCLUDED_GROUPS.includes(g))
-    .filter((g) => modelEnableGroups.includes(g))
+  return getModelDisplayGroups(model, usableGroup)
 }
 
 /**
@@ -47,51 +76,68 @@ export function getConfiguredGroupRatio(
   group: string
 ): number {
   const ratio = groupRatio[group]
-  return typeof ratio === 'number' && Number.isFinite(ratio) ? ratio : 1
+  return typeof ratio === 'number' && Number.isFinite(ratio) && ratio >= 0
+    ? ratio
+    : 1
+}
+
+export type ModelPriceGroup = { group: string | null; ratio: number }
+
+/** Resolve the concrete group and multiplier used for a model's displayed price. */
+export function getModelPriceGroup(
+  model: PricingModel,
+  selectedGroup?: string,
+  usableGroup?: UsableGroupInput
+): ModelPriceGroup {
+  const groups = getModelDisplayGroups(model, usableGroup)
+  const ratios = model.group_ratio ?? {}
+
+  if (
+    selectedGroup &&
+    selectedGroup !== FILTER_ALL &&
+    groups.includes(selectedGroup)
+  ) {
+    return {
+      group: selectedGroup,
+      ratio: getConfiguredGroupRatio(ratios, selectedGroup),
+    }
+  }
+
+  let best: ModelPriceGroup = { group: null, ratio: 1 }
+  let bestFixedPrice = Number.POSITIVE_INFINITY
+  for (const group of groups) {
+    const ratio = getConfiguredGroupRatio(ratios, group)
+    if (model.quota_type === QUOTA_TYPE_VALUES.REQUEST) {
+      const override = model.fixed_price_overrides?.[group]?.price
+      const fixedPrice =
+        typeof override === 'number' && Number.isFinite(override)
+          ? override
+          : (model.model_price || 0) * (model.uniform_group_price ? 1 : ratio)
+      if (best.group === null || fixedPrice < bestFixedPrice) {
+        best = { group, ratio }
+        bestFixedPrice = fixedPrice
+      }
+      continue
+    }
+    if (best.group === null || ratio < best.ratio) {
+      best = { group, ratio }
+    }
+  }
+  return best
 }
 
 /**
  * Resolve the group ratio used by model square summary prices.
  *
  * When no specific group is selected, the model square shows the best price
- * available to the viewer. When a group filter is active, it mirrors classic
- * and shows that group's price.
+ * available to the viewer. When a group filter is active, it shows that
+ * group's price instead.
  */
 export function getDisplayGroupRatio(
   model: PricingModel,
   selectedGroup?: string
 ): number {
-  const modelEnableGroups = Array.isArray(model.enable_groups)
-    ? model.enable_groups
-    : []
-  const groupRatio = model.group_ratio || {}
-
-  if (
-    selectedGroup &&
-    selectedGroup !== FILTER_ALL &&
-    modelEnableGroups.includes(selectedGroup)
-  ) {
-    return getConfiguredGroupRatio(groupRatio, selectedGroup)
-  }
-
-  if (modelEnableGroups.length === 0) {
-    return 1
-  }
-
-  let minRatio = Number.POSITIVE_INFINITY
-
-  for (const group of modelEnableGroups) {
-    const ratio = groupRatio[group]
-    if (
-      typeof ratio === 'number' &&
-      Number.isFinite(ratio) &&
-      ratio < minRatio
-    ) {
-      minRatio = ratio
-    }
-  }
-
-  return minRatio === Number.POSITIVE_INFINITY ? 1 : minRatio
+  return getModelPriceGroup(model, selectedGroup).ratio
 }
 
 /**

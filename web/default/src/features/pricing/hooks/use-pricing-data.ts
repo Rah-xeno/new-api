@@ -20,16 +20,22 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
 import { useStatus } from '@/hooks/use-status'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { getPricing } from '../api'
+import { normalizeModelGroups } from '../lib/model-helpers'
 
-export function usePricingData() {
+export function usePricingData(enabled = true) {
   const { status } = useStatus()
+  const authUser = useAuthStore((state) => state.auth.user)
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['pricing'],
+    queryKey: ['pricing', authUser?.id ?? 'guest', authUser?.group ?? ''],
     queryFn: getPricing,
     staleTime: 5 * 60 * 1000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
+    enabled,
   })
 
   // Ensure rates never reach zero to prevent division errors
@@ -43,9 +49,10 @@ export function usePricingData() {
   )
 
   const models = useMemo(() => {
-    if (!data?.data || !data?.vendors) return []
+    if (!data?.data) return []
 
-    const vendorMap = new Map(data.vendors.map((v) => [v.id, v]))
+    const vendorMap = new Map((data.vendors ?? []).map((v) => [v.id, v]))
+    const usableGroup = data.usable_group ?? {}
 
     return data.data.map((model) => {
       const vendor = model.vendor_id
@@ -57,7 +64,8 @@ export function usePricingData() {
         vendor_name: vendor?.name,
         vendor_icon: vendor?.icon,
         vendor_description: vendor?.description,
-        group_ratio: data.group_ratio,
+        enable_groups: normalizeModelGroups(model, usableGroup),
+        group_ratio: data.group_ratio ?? {},
       }
     })
   }, [data])

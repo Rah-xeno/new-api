@@ -1,6 +1,9 @@
 {
   "name": "new-api-web-workspace",
   "private": true,
+  "dependencies": {
+    "date-fns": "^2.30.0"
+  },
   "workspaces": [
     "default",
     "classic"
