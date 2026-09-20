@@ -1,0 +1,7 @@
+# Use with docker-compose.yml to build the integrated frontend from this source.
+services:
+  new-api:
+    image: new-api-goodapi:local
+    build:
+      context: .
+      dockerfile: Dockerfile

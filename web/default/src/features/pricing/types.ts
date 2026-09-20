@@ -27,6 +27,23 @@ export type PricingVendor = {
   description?: string
 }
 
+export type BillingUsageUnit = 'second' | 'count' | 'token' | 'credit'
+
+export type BillingUsageFieldSchema = {
+  type?: 'number' | 'boolean'
+  unit?: BillingUsageUnit
+  enum?: string[]
+  enumLabels?: Record<string, string | Record<string, string>>
+  description?: string | Record<string, string>
+}
+
+export type BillingUsageSchema = Record<string, BillingUsageFieldSchema>
+
+export type BillingUsageExample = {
+  label: string
+  facts: Record<string, string | number>
+}
+
 export type PricingModel = {
   id: number
   model_name: string
@@ -40,6 +57,7 @@ export type PricingModel = {
   model_ratio: number
   completion_ratio: number
   model_price?: number
+  uniform_group_price?: boolean
   cache_ratio?: number | null
   create_cache_ratio?: number | null
   image_ratio?: number | null
@@ -54,6 +72,10 @@ export type PricingModel = {
   billing_mode?: string
   /** Raw expression describing dynamic / tiered billing */
   billing_expr?: string
+  /** Task-plugin usage facts and their billing units. */
+  billing_usage_schema?: BillingUsageSchema
+  /** Display-only labeled usage vectors for pricing examples. */
+  billing_usage_examples?: BillingUsageExample[]
   /** Pricing version returned by backend, useful for cache busting */
   pricing_version?: string
   /**
@@ -68,7 +90,17 @@ export type PricingModel = {
   input_modalities?: Modality[]
   output_modalities?: Modality[]
   capabilities?: ModelCapability[]
+  /** Effective fixed per-request prices visible to the current viewer. */
+  fixed_price_overrides?: Record<string, FixedPriceOverride>
 }
+
+export type FixedPriceOverride = {
+  price: number
+  source: 'user' | 'group'
+}
+
+/** Groups visible to the current viewer, keyed by group name. */
+export type UsableGroup = Record<string, string>
 
 /** Input/output modalities supported by a model. */
 export type Modality = 'text' | 'image' | 'audio' | 'video' | 'file'
@@ -94,7 +126,7 @@ export type PricingData = {
   data: PricingModel[]
   vendors: PricingVendor[]
   group_ratio: Record<string, number>
-  usable_group: Record<string, { desc: string; ratio: number }>
+  usable_group: UsableGroup
   supported_endpoint: Record<string, string>
   auto_groups: string[]
 }

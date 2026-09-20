@@ -17,8 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { useTranslation } from 'react-i18next'
 
-import { Sidebar, SidebarContent, SidebarRail } from '@/components/ui/sidebar'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarRail,
+} from '@/components/ui/sidebar'
 import { useLayout } from '@/context/layout-provider'
 import { useSidebarView } from '@/hooks/use-sidebar-view'
 import { MOTION_TRANSITION, MOTION_VARIANTS } from '@/lib/motion'
@@ -44,15 +50,28 @@ import { SidebarViewHeader } from './sidebar-view-header'
  * in the registry; this component requires no changes.
  */
 export function AppSidebar() {
+  const { t } = useTranslation()
   const { collapsible, variant } = useLayout()
   const { key, view, navGroups } = useSidebarView()
   const shouldReduce = useReducedMotion()
 
   return (
     <Sidebar collapsible={collapsible} variant={variant}>
-      {view && <SidebarViewHeader view={view} />}
+      {view ? (
+        <SidebarViewHeader view={view} />
+      ) : (
+        <SidebarHeader className='scaling-dashboard-workspace group-data-[collapsible=icon]:hidden'>
+          <span className='scaling-dashboard-workspace-caption'>
+            {t('Workspace')}
+          </span>
+          <span className='scaling-dashboard-workspace-title'>
+            {t('Console')}
+            <span aria-hidden='true'>/ 01</span>
+          </span>
+        </SidebarHeader>
+      )}
 
-      <SidebarContent className='py-2'>
+      <SidebarContent className='scaling-dashboard-navigation py-2'>
         <AnimatePresence mode='wait' initial={false}>
           <motion.div
             key={key}

@@ -37,6 +37,7 @@ import {
   getEndpointTypeLabels,
   getQuotaTypeLabels,
 } from '../constants'
+import { hasTaskUsageSchema } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
 import type { PricingModel, PricingVendor } from '../types'
 
@@ -53,9 +54,12 @@ type FilterSectionProps = {
   value: string
   options: FilterOption[]
   onChange: (value: string) => void
+  defaultOpen?: boolean
+  className?: string
 }
 
 export interface PricingSidebarProps {
+  catalog?: boolean
   quotaTypeFilter: string
   endpointTypeFilter: string
   vendorFilter: string
@@ -97,15 +101,13 @@ function FilterChip(props: {
   onClick: () => void
 }) {
   return (
-    <button
+    <Button
       type='button'
+      variant={props.active ? 'secondary' : 'outline'}
+      size='sm'
       onClick={props.onClick}
-      className={cn(
-        'group inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-all',
-        props.active
-          ? 'border-foreground/30 bg-foreground/5 text-foreground shadow-sm'
-          : 'border-border/70 bg-background text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground'
-      )}
+      aria-pressed={props.active}
+      className='h-auto max-w-full gap-1.5 px-2 py-1 text-xs'
       title={props.option.label}
     >
       {props.option.icon && (
@@ -124,15 +126,18 @@ function FilterChip(props: {
           {props.option.suffix ?? props.option.count}
         </span>
       )}
-    </button>
+    </Button>
   )
 }
 
 function FilterSection(props: FilterSectionProps) {
   return (
     <Collapsible
-      defaultOpen
-      className='border-border/70 border-b pb-3 last:border-b-0'
+      defaultOpen={props.defaultOpen ?? true}
+      className={cn(
+        'border-border/70 border-b pb-3 last:border-b-0',
+        props.className
+      )}
     >
       <CollapsibleTrigger className='group flex w-full items-center justify-between py-2.5 text-left'>
         <span className='text-foreground text-sm font-semibold'>
@@ -141,7 +146,7 @@ function FilterSection(props: FilterSectionProps) {
         <ChevronDown className='text-muted-foreground size-4 transition-transform group-data-[panel-open]:rotate-180' />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className='flex flex-wrap gap-1.5'>
+        <div className='pricing-filter-options flex flex-wrap gap-1.5'>
           {props.options.map((option) => (
             <FilterChip
               key={option.value}
@@ -201,12 +206,23 @@ export function PricingSidebar(props: PricingSidebarProps) {
     {
       value: QUOTA_TYPES.TOKEN,
       label: quotaTypeLabels[QUOTA_TYPES.TOKEN],
-      count: countBy(props.models, (model) => model.quota_type === 0),
+      count: countBy(
+        props.models,
+        (model) => model.quota_type === 0 && !hasTaskUsageSchema(model)
+      ),
     },
     {
       value: QUOTA_TYPES.REQUEST,
       label: quotaTypeLabels[QUOTA_TYPES.REQUEST],
-      count: countBy(props.models, (model) => model.quota_type === 1),
+      count: countBy(
+        props.models,
+        (model) => model.quota_type === 1 && !hasTaskUsageSchema(model)
+      ),
+    },
+    {
+      value: QUOTA_TYPES.TASK,
+      label: quotaTypeLabels[QUOTA_TYPES.TASK],
+      count: countBy(props.models, (model) => hasTaskUsageSchema(model)),
     },
   ]
 
@@ -246,12 +262,20 @@ export function PricingSidebar(props: PricingSidebarProps) {
   ]
 
   return (
-    <aside className={cn('rounded-xl border p-3', props.className)}>
+    <aside
+      className={cn(
+        'bg-card rounded-xl border p-3',
+        props.catalog && 'pricing-catalog-sidebar',
+        props.className
+      )}
+    >
       <div className='mb-2.5 flex items-center justify-between gap-2'>
         <div>
           <h2 className='text-foreground text-sm font-bold'>{t('Filter')}</h2>
           <p className='text-muted-foreground mt-1 text-xs'>
-            {t('Refine models by provider, group, type, and tags.')}
+            {props.catalog
+              ? t('Find your model')
+              : t('Refine models by provider, group, type, and tags.')}
           </p>
         </div>
         <Button
@@ -274,31 +298,37 @@ export function PricingSidebar(props: PricingSidebarProps) {
       )}
 
       <div className='space-y-1'>
+        {!props.catalog && (
+          <FilterSection
+            title={t('Groups')}
+            value={props.groupFilter}
+            options={groupOptions}
+            onChange={props.onGroupChange}
+          />
+        )}
         <FilterSection
-          title={t('Groups')}
-          value={props.groupFilter}
-          options={groupOptions}
-          onChange={props.onGroupChange}
-        />
-        <FilterSection
+          className={props.catalog ? 'pricing-provider-section' : undefined}
           title={t('All Vendors')}
           value={props.vendorFilter}
           options={vendorOptions}
           onChange={props.onVendorChange}
         />
         <FilterSection
+          defaultOpen={!props.catalog}
           title={t('Model Tags')}
           value={props.tagFilter}
           options={tagOptions}
           onChange={props.onTagChange}
         />
         <FilterSection
+          defaultOpen={!props.catalog}
           title={t('Pricing Type')}
           value={props.quotaTypeFilter}
           options={quotaOptions}
           onChange={props.onQuotaTypeChange}
         />
         <FilterSection
+          defaultOpen={!props.catalog}
           title={t('Endpoint Type')}
           value={props.endpointTypeFilter}
           options={endpointOptions}

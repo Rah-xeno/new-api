@@ -1,0 +1,230 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+*/
+
+.pricing-u3-card {
+  --u3-sage: color-mix(in srgb, var(--primary) 14%, var(--background));
+  --u3-line: color-mix(in srgb, var(--primary) 22%, var(--border));
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: transform 220ms ease;
+}
+
+.pricing-u3-card::before {
+  content: '';
+  position: absolute;
+  inset: 10px -5px -7px 5px;
+  z-index: -1;
+  border: 1px solid var(--u3-line);
+  border-radius: 1rem;
+  background: var(--u3-sage);
+  transform: rotate(-1deg);
+  transition:
+    transform 320ms ease,
+    background-color 320ms ease;
+}
+
+.pricing-u3-main {
+  position: relative;
+  z-index: 3;
+  overflow: hidden;
+  border: 1px solid var(--u3-line);
+  border-radius: 1rem 1rem 0.65rem 0.65rem;
+  background: var(--card);
+  box-shadow: 0 0.65rem 1.5rem -1.2rem
+    color-mix(in srgb, var(--primary) 45%, transparent);
+  transition:
+    transform 320ms ease,
+    box-shadow 320ms ease,
+    border-color 220ms ease;
+}
+
+.pricing-u3-card .pricing-u3-main > [data-slot='card-header'],
+.pricing-u3-card .pricing-u3-main > [data-slot='card-content'] {
+  position: relative;
+  z-index: 1;
+  background: var(--card);
+}
+
+.pricing-u3-card .pricing-u3-main > [data-slot='card-header'] {
+  padding: 1.25rem 1.5rem 1rem;
+}
+
+.pricing-u3-card .pricing-u3-main > [data-slot='card-content'] {
+  padding: 0 1.5rem 1.25rem;
+}
+
+.pricing-u3-price {
+  position: relative;
+  z-index: 2;
+  margin: -0.1rem 0.8rem 0;
+  padding: 0.9rem 1rem 0.8rem;
+  border: 1px solid var(--u3-line);
+  border-top: 0;
+  border-radius: 0 0 0.8rem 0.8rem;
+  background: color-mix(in srgb, var(--primary) 9%, var(--card));
+  box-shadow: 0 0.8rem 1.2rem -1.1rem
+    color-mix(in srgb, var(--primary) 48%, transparent);
+  transform-origin: 50% 0;
+  transform: perspective(900px) rotateX(-14deg) translateY(-0.35rem);
+  opacity: 0.94;
+  transition:
+    transform 320ms ease,
+    opacity 240ms ease,
+    box-shadow 320ms ease;
+}
+
+.pricing-u3-price-source {
+  min-width: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.pricing-u3-card > [data-slot='card-footer'] {
+  position: relative;
+  z-index: 2;
+  margin: 0 0.8rem;
+  border: 1px solid var(--u3-line);
+  border-radius: 0.65rem;
+  background: var(--card);
+  box-shadow: 0 0.65rem 1.2rem -1rem
+    color-mix(in srgb, var(--primary) 34%, transparent);
+  transition:
+    border-color 220ms ease,
+    background-color 220ms ease;
+}
+
+.pricing-u3-card:hover,
+.pricing-u3-card:focus-within {
+  transform: translateY(-3px);
+}
+
+.pricing-u3-card:hover::before,
+.pricing-u3-card:focus-within::before {
+  background: color-mix(in srgb, var(--accent) 70%, var(--background));
+  transform: rotate(1deg) translateY(3px);
+}
+
+.pricing-u3-card:hover .pricing-u3-main,
+.pricing-u3-card:focus-within .pricing-u3-main {
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+  box-shadow: 0 1.2rem 2.2rem -1.4rem
+    color-mix(in srgb, var(--primary) 58%, transparent);
+}
+
+.pricing-u3-card:hover .pricing-u3-price,
+.pricing-u3-card:focus-within .pricing-u3-price {
+  transform: perspective(900px) rotateX(0) translateY(0);
+  opacity: 1;
+}
+
+.pricing-u3-card:hover > [data-slot='card-footer'],
+.pricing-u3-card:focus-within > [data-slot='card-footer'] {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+  background: color-mix(in srgb, var(--accent) 48%, var(--card));
+}
+
+.pricing-u3-card .pricing-u3-groups {
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.pricing-u3-group-badge,
+.pricing-u3-group-more {
+  min-width: 2rem;
+  min-height: 1.75rem;
+  max-width: 8rem;
+  overflow: hidden;
+  border: 1px dashed color-mix(in srgb, var(--primary) 35%, var(--border));
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  background: color-mix(in srgb, var(--accent) 48%, var(--card));
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.pricing-u3-group-badge:hover,
+.pricing-u3-group-badge:focus-visible,
+.pricing-u3-group-more:hover,
+.pricing-u3-group-more:focus-visible,
+.pricing-u3-group-badge[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 13%, var(--card));
+  color: var(--primary);
+}
+
+.pricing-u3-group-more {
+  min-width: auto;
+  border-style: solid;
+  padding-inline: 0.4rem;
+}
+
+@media (max-width: 640px) {
+  .pricing-u3-card:hover,
+  .pricing-u3-card:focus-within {
+    transform: none;
+  }
+
+  .pricing-u3-card::before {
+    inset: 8px -3px -5px 3px;
+  }
+
+  .pricing-u3-card > [data-slot='card-footer'],
+  .pricing-u3-price {
+    margin-inline: 0.6rem;
+  }
+
+  .pricing-u3-price {
+    transform: none;
+  }
+
+  .pricing-u3-group-badge,
+  .pricing-u3-group-more {
+    min-height: 2.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-u3-card,
+  .pricing-u3-card::before,
+  .pricing-u3-card .pricing-u3-main,
+  .pricing-u3-price,
+  .pricing-u3-card > [data-slot='card-footer'] {
+    transition: none;
+  }
+}
+
+.pricing-u3-price .font-semibold {
+  font-size: 20px;
+  color: var(--primary);
+}
+.pricing-u3-card > [data-slot='card-footer'] button {
+  min-height: 44px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pricing-u3-card,
+  .pricing-u3-card::before,
+  .pricing-u3-card .pricing-u3-main,
+  .pricing-u3-card .pricing-u3-price {
+    transform: none !important;
+  }
+}

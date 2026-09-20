@@ -46,6 +46,13 @@ type StaticDataTableDataProps<TData = unknown> = StaticDataTableBaseProps & {
   data: TData[]
   getRowKey?: (row: TData, index: number) => React.Key
   getRowClassName?: (row: TData, index: number) => string | undefined
+  getRowProps?: (
+    row: TData,
+    index: number
+  ) => Pick<
+    React.ComponentProps<typeof TableRow>,
+    'draggable' | 'onDragStart' | 'onDragOver' | 'onDrop' | 'onDragEnd'
+  >
   renderRow?: (row: TData, index: number) => React.ReactNode
   empty?: boolean
   emptyContent?: React.ReactNode
@@ -97,6 +104,7 @@ function StaticDataTableWithColumns<TData>({
   data,
   getRowKey,
   getRowClassName,
+  getRowProps,
   renderRow,
   empty,
   emptyContent,
@@ -111,6 +119,7 @@ function StaticDataTableWithColumns<TData>({
       index={index}
       columns={columns}
       getRowClassName={getRowClassName}
+      getRowProps={getRowProps}
       renderRow={renderRow}
     />
   ))
@@ -145,7 +154,10 @@ function StaticDataTableWithColumns<TData>({
 type StaticDataTableRowProps<TData> = Required<
   Pick<StaticDataTableDataProps<TData>, 'columns'>
 > &
-  Pick<StaticDataTableDataProps<TData>, 'getRowClassName' | 'renderRow'> & {
+  Pick<
+    StaticDataTableDataProps<TData>,
+    'getRowClassName' | 'renderRow' | 'getRowProps'
+  > & {
     row: TData
     index: number
   }
@@ -155,6 +167,7 @@ function StaticDataTableRow<TData>({
   index,
   columns,
   getRowClassName,
+  getRowProps,
   renderRow,
 }: StaticDataTableRowProps<TData>) {
   if (renderRow) {
@@ -162,7 +175,10 @@ function StaticDataTableRow<TData>({
   }
 
   return (
-    <TableRow className={getRowClassName?.(row, index)}>
+    <TableRow
+      className={getRowClassName?.(row, index)}
+      {...getRowProps?.(row, index)}
+    >
       {columns.map((column) => (
         <TableCell
           key={column.id}

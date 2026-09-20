@@ -16,7 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { ConfigDrawer } from '@/components/config-drawer'
+import { useTranslation } from 'react-i18next'
+
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -25,14 +26,14 @@ import { useNotifications } from '@/hooks/use-notifications'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
 
 import { defaultTopNavLinks } from '../config/top-nav.config'
-import { type TopNavLink } from '../types'
+import type { TopNavLink } from '../types'
 import { Header } from './header'
 import { SystemBrand } from './system-brand'
 import { TopNav } from './top-nav'
 
 /**
  * General application Header component
- * Integrates navigation bar, search, configuration and profile functions
+ * Integrates navigation bar, search, notifications and profile functions
  *
  * @example
  * // Basic usage
@@ -82,11 +83,6 @@ type AppHeaderProps = {
    */
   showNotifications?: boolean
   /**
-   * Whether to show config drawer
-   * @default true
-   */
-  showConfigDrawer?: boolean
-  /**
    * Whether to show profile dropdown
    * @default true
    */
@@ -100,9 +96,9 @@ export function AppHeader({
   showSearch = true,
   rightContent,
   showNotifications = true,
-  showConfigDrawer = true,
   showProfileDropdown = true,
 }: AppHeaderProps) {
+  const { t } = useTranslation()
   // Prioritize dynamically generated links from backend
   const dynamicLinks = useTopNavLinks()
   const links = dynamicLinks.length > 0 ? dynamicLinks : navLinks
@@ -111,40 +107,38 @@ export function AppHeader({
   const notifications = useNotifications()
 
   return (
-    <>
-      <Header>
-        <SystemBrand variant='inline' />
+    <Header className='scaling-dashboard-header'>
+      <SystemBrand variant='inline' />
+      <span className='scaling-dashboard-header-label'>{t('Workspace')}</span>
 
-        {leftContent ? (
-          <div className='ms-2 flex items-center'>{leftContent}</div>
-        ) : null}
+      {leftContent ? (
+        <div className='ms-2 flex items-center'>{leftContent}</div>
+      ) : null}
 
-        {rightContent ?? (
-          <div className='ms-auto flex items-center gap-1 sm:gap-2'>
-            {showTopNav && (
-              <div className='me-1 hidden lg:block'>
-                <TopNav links={links} />
-              </div>
-            )}
-            {showSearch && <Search />}
-            {showNotifications && (
-              <NotificationPopover
-                open={notifications.popoverOpen}
-                onOpenChange={notifications.setPopoverOpen}
-                unreadCount={notifications.unreadCount}
-                activeTab={notifications.activeTab}
-                onTabChange={notifications.setActiveTab}
-                notice={notifications.notice}
-                announcements={notifications.announcements}
-                loading={notifications.loading}
-              />
-            )}
-            <LanguageSwitcher />
-            {showConfigDrawer && <ConfigDrawer />}
-            {showProfileDropdown && <ProfileDropdown />}
-          </div>
-        )}
-      </Header>
-    </>
+      {rightContent ?? (
+        <div className='scaling-dashboard-header-actions ms-auto flex items-center gap-1 sm:gap-2'>
+          {showTopNav && (
+            <div className='scaling-dashboard-topnav me-1'>
+              <TopNav links={links} />
+            </div>
+          )}
+          {showSearch && <Search className='scaling-dashboard-search' />}
+          {showNotifications && (
+            <NotificationPopover
+              open={notifications.popoverOpen}
+              onOpenChange={notifications.setPopoverOpen}
+              unreadCount={notifications.unreadCount}
+              activeTab={notifications.activeTab}
+              onTabChange={notifications.setActiveTab}
+              notice={notifications.notice}
+              announcements={notifications.announcements}
+              loading={notifications.loading}
+            />
+          )}
+          <LanguageSwitcher />
+          {showProfileDropdown && <ProfileDropdown />}
+        </div>
+      )}
+    </Header>
   )
 }

@@ -84,9 +84,18 @@ export function UptimeSparkline(props: UptimeSparklineProps) {
   const gap = size === 'sm' ? 'gap-px' : 'gap-[2px]'
 
   return (
-    <div className={cn('flex items-center gap-2', props.className)}>
+    <div
+      className={cn(
+        'flex min-w-0 max-w-full items-center gap-2 overflow-hidden',
+        props.className
+      )}
+    >
       <div
-        className={cn('flex items-end', containerHeight, gap)}
+        className={cn(
+          'flex min-w-0 max-w-full shrink items-end overflow-hidden',
+          containerHeight,
+          gap
+        )}
         role='img'
         aria-label={`30 day uptime ${overall.toFixed(2)}%`}
       >
@@ -156,30 +165,31 @@ export function UptimeStatusRow(props: {
     return 'major'
   }, [summary.uptime_pct])
 
-  const StatusIcon =
-    status === 'operational'
-      ? CheckCircle2
-      : status === 'minor'
-        ? Activity
-        : AlertCircle
-
-  const statusColour =
-    status === 'operational'
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : status === 'minor'
-        ? 'text-emerald-600 dark:text-emerald-400'
-        : status === 'degraded'
-          ? 'text-amber-600 dark:text-amber-400'
-          : 'text-rose-600 dark:text-rose-400'
-
-  const statusLabel =
-    status === 'operational'
-      ? t('All systems operational')
-      : status === 'minor'
-        ? t('Minor blips in the last 30 days')
-        : status === 'degraded'
-          ? t('Degraded performance recently')
-          : t('Significant outages detected')
+  const statusPresentation = {
+    operational: {
+      icon: CheckCircle2,
+      colour: 'text-emerald-600 dark:text-emerald-400',
+      label: t('All systems operational'),
+    },
+    minor: {
+      icon: Activity,
+      colour: 'text-emerald-600 dark:text-emerald-400',
+      label: t('Minor blips in the last 30 days'),
+    },
+    degraded: {
+      icon: AlertCircle,
+      colour: 'text-amber-600 dark:text-amber-400',
+      label: t('Degraded performance recently'),
+    },
+    major: {
+      icon: AlertCircle,
+      colour: 'text-rose-600 dark:text-rose-400',
+      label: t('Significant outages detected'),
+    },
+  }[status]
+  const StatusIcon = statusPresentation.icon
+  const statusColour = statusPresentation.colour
+  const statusLabel = statusPresentation.label
 
   return (
     <div

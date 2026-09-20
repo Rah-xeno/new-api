@@ -37,6 +37,7 @@ export interface ModelCardGridProps {
   tokenUnit?: TokenUnit
   showRechargePrice?: boolean
   selectedGroup?: string
+  onGroupChange?: (group: string) => void
 }
 
 export function ModelCardGrid(props: ModelCardGridProps) {
@@ -72,8 +73,8 @@ export function ModelCardGrid(props: ModelCardGridProps) {
   }
 
   return (
-    <div className='space-y-4 sm:space-y-5'>
-      <div className='grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3'>
+    <div className='flex flex-col gap-4 sm:gap-5'>
+      <div className='grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-6'>
         {pagedModels.map((model) => (
           <ModelCard
             key={model.id ?? model.model_name}
@@ -83,6 +84,7 @@ export function ModelCardGrid(props: ModelCardGridProps) {
             usdExchangeRate={props.usdExchangeRate}
             showRechargePrice={props.showRechargePrice}
             selectedGroup={props.selectedGroup}
+            onGroupChange={props.onGroupChange}
             perf={perfMap.get(model.model_name || '')}
             onClick={() => props.onModelClick(model.model_name || '')}
           />

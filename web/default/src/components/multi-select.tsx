@@ -8,11 +8,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
+along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
@@ -41,6 +41,7 @@ import { cn } from '@/lib/utils'
 export type Option = {
   label: string
   value: string
+  description?: string
 }
 
 interface MultiSelectProps {
@@ -60,6 +61,9 @@ interface MultiSelectProps {
   emptyText?: string
   /** Optional `id` to wire labels/aria-describedby to the input. */
   id?: string
+  'aria-label'?: string
+  'aria-describedby'?: string
+  'aria-invalid'?: React.AriaAttributes['aria-invalid']
   /** Disable the entire control. */
   disabled?: boolean
   /**
@@ -138,6 +142,13 @@ export function MultiSelect(props: MultiSelectProps) {
     }
     return map
   }, [props.options])
+  const descriptionMap = React.useMemo(() => {
+    const map = new Map<string, string>()
+    for (const option of props.options) {
+      if (option.description) map.set(option.value, option.description)
+    }
+    return map
+  }, [props.options])
 
   const trimmedInput = inputValue.trim()
   const inputMatchesExisting =
@@ -164,7 +175,7 @@ export function MultiSelect(props: MultiSelectProps) {
     if (canCreate) {
       set.add(trimmedInput)
     }
-    return Array.from(set)
+    return [...set]
   }, [props.options, props.selected, canCreate, trimmedInput])
 
   const addValues = React.useCallback(
@@ -254,7 +265,15 @@ export function MultiSelect(props: MultiSelectProps) {
       inputValue={inputValue}
       onInputValueChange={handleInputValueChange}
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(nextOpen, details) => {
+        // Base UI 1.6 closes after a filtered pick and can retain that query
+        // when reopened mid-animation. Multi-select should stay open instead.
+        if (!nextOpen && details.reason === 'item-press') {
+          details.cancel()
+          return
+        }
+        setOpen(nextOpen)
+      }}
       disabled={props.disabled}
     >
       <ComboboxChips
@@ -346,7 +365,9 @@ export function MultiSelect(props: MultiSelectProps) {
               : undefined
           }
           onKeyDown={handleKeyDown}
-          aria-label={placeholder}
+          aria-label={props['aria-label'] ?? placeholder}
+          aria-describedby={props['aria-describedby']}
+          aria-invalid={props['aria-invalid']}
         />
       </ComboboxChips>
 
@@ -356,6 +377,7 @@ export function MultiSelect(props: MultiSelectProps) {
             {(item: string) => {
               const isCreate = canCreate && item === trimmedInput
               const label = labelMap.get(item) ?? item
+              const description = descriptionMap.get(item)
               return (
                 <ComboboxItem
                   key={item}
@@ -377,7 +399,14 @@ export function MultiSelect(props: MultiSelectProps) {
                       </span>
                     </>
                   ) : (
-                    <span className='truncate'>{label}</span>
+                    <span className='min-w-0 break-words'>
+                      <span className='block truncate'>{label}</span>
+                      {description && (
+                        <span className='text-muted-foreground block truncate text-xs'>
+                          {description}
+                        </span>
+                      )}
+                    </span>
                   )}
                 </ComboboxItem>
               )

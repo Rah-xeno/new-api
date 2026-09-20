@@ -45,6 +45,7 @@ import { routeTree } from './routeTree.gen'
 
 // Styles
 import './styles/index.css'
+import './styles/scaling-transition.css'
 
 // Ensure VChart theme is initialized before any chart mounts (prevents white default theme flash)
 // VChart theme is driven by our ThemeProvider (html.light/html.dark) via per-chart `theme` prop.
@@ -116,7 +117,10 @@ declare module '@tanstack/react-router' {
 }
 
 // Render the app
-const rootElement = document.getElementById('root')!
+const rootElement = document.querySelector<HTMLElement>('#root')
+if (!rootElement) {
+  throw new Error('Root element not found')
+}
 // Set document.title and favicon from cached status, then refresh from network
 ;(function initSystemBranding() {
   try {
