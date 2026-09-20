@@ -11,6 +11,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/dev"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/clickhouse"
@@ -202,7 +203,8 @@ func InitDB() (err error) {
 		}
 		sqlDB.SetMaxIdleConns(common.GetEnvOrDefault("SQL_MAX_IDLE_CONNS", 100))
 		sqlDB.SetMaxOpenConns(common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", 1000))
-		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
+		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 1800)))
+		sqlDB.SetConnMaxIdleTime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_IDLE_TIME", 300)))
 
 		if !common.IsMasterNode {
 			return nil
@@ -246,7 +248,8 @@ func InitLogDB() (err error) {
 		}
 		sqlDB.SetMaxIdleConns(common.GetEnvOrDefault("SQL_MAX_IDLE_CONNS", 100))
 		sqlDB.SetMaxOpenConns(common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", 1000))
-		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
+		sqlDB.SetConnMaxIdleTime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_IDLE_TIME", 300)))
+		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 1800)))
 
 		if !common.IsMasterNode {
 			return nil
@@ -267,11 +270,31 @@ func migrateDB() error {
 	if err := migrateTokenModelLimitsToText(); err != nil {
 		return err
 	}
+	if err := migrateQuotaColumnsToBigint(); err != nil {
+		return err
+	}
+	if err := migrateUserRegistrationIP(); err != nil {
+		return err
+	}
+
+	if skip, err := shouldSkipLegacyAgentSQLiteAutoMigrate("users"); err != nil {
+		return err
+	} else if !skip {
+		if err := DB.AutoMigrate(&User{}); err != nil {
+			return err
+		}
+	}
+	if skip, err := shouldSkipLegacyAgentSQLiteAutoMigrate("agent_commission_records"); err != nil {
+		return err
+	} else if !skip {
+		if err := DB.AutoMigrate(&AgentCommissionRecord{}); err != nil {
+			return err
+		}
+	}
 
 	err := DB.AutoMigrate(
 		&Channel{},
 		&Token{},
-		&User{},
 		&PasskeyCredential{},
 		&Option{},
 		&Redemption{},
@@ -303,6 +326,9 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
+	if err := normalizeAgentDistributionUsers(); err != nil {
+		return err
+	}
 	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
 		if err := ensureSubscriptionPlanTableSQLite(); err != nil {
 			return err
@@ -312,10 +338,20 @@ func migrateDB() error {
 			return err
 		}
 	}
+	// Dev: Invite Plans
+	if err := dev.AutoMigrateInvitePlans(DB); err != nil {
+		return err
+	}
 	return nil
 }
 
 func migrateDBFast() error {
+	if err := migrateQuotaColumnsToBigint(); err != nil {
+		return err
+	}
+	if err := migrateUserRegistrationIP(); err != nil {
+		return err
+	}
 
 	var wg sync.WaitGroup
 
@@ -325,7 +361,6 @@ func migrateDBFast() error {
 	}{
 		{&Channel{}, "Channel"},
 		{&Token{}, "Token"},
-		{&User{}, "User"},
 		{&PasskeyCredential{}, "PasskeyCredential"},
 		{&Option{}, "Option"},
 		{&Redemption{}, "Redemption"},
@@ -352,6 +387,22 @@ func migrateDBFast() error {
 		{&SystemTask{}, "SystemTask"},
 		{&SystemTaskLock{}, "SystemTaskLock"},
 	}
+	if skip, err := shouldSkipLegacyAgentSQLiteAutoMigrate("users"); err != nil {
+		return err
+	} else if !skip {
+		migrations = append(migrations, struct {
+			model interface{}
+			name  string
+		}{&User{}, "User"})
+	}
+	if skip, err := shouldSkipLegacyAgentSQLiteAutoMigrate("agent_commission_records"); err != nil {
+		return err
+	} else if !skip {
+		migrations = append(migrations, struct {
+			model interface{}
+			name  string
+		}{&AgentCommissionRecord{}, "AgentCommissionRecord"})
+	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
 	errChan := make(chan error, len(migrations))
 
@@ -375,6 +426,9 @@ func migrateDBFast() error {
 			return err
 		}
 	}
+	if err := normalizeAgentDistributionUsers(); err != nil {
+		return err
+	}
 	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
 		if err := ensureSubscriptionPlanTableSQLite(); err != nil {
 			return err
@@ -386,6 +440,35 @@ func migrateDBFast() error {
 	}
 	common.SysLog("database migrated")
 	return nil
+}
+
+// migrateUserRegistrationIP adds the column before the full User migration so
+// legacy SQLite schemas that cannot be parsed by GORM still receive it.
+func migrateUserRegistrationIP() error {
+	migrator := DB.Migrator()
+	if !migrator.HasTable(&User{}) || migrator.HasColumn(&User{}, "registration_ip") {
+		return nil
+	}
+	return migrator.AddColumn(&User{}, "RegistrationIP")
+}
+
+// shouldSkipLegacyAgentSQLiteAutoMigrate detects tables created by the old
+// project with DECIMAL(10,4) agent-rate columns. The glebarez SQLite migrator
+// cannot re-parse SQLite DDL containing the comma in that type declaration.
+// Those old tables already have the exact columns used here, so leaving them
+// in place preserves their schema and data; newly created SQLite databases use
+// AgentRate's comma-free DECIMAL declaration and continue through AutoMigrate.
+func shouldSkipLegacyAgentSQLiteAutoMigrate(tableName string) (bool, error) {
+	if !common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+		return false, nil
+	}
+	var createSQL string
+	result := DB.Raw("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", tableName).Scan(&createSQL)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	compactSQL := strings.NewReplacer(" ", "", "\n", "", "\r", "", "\t", "").Replace(strings.ToLower(createSQL))
+	return strings.Contains(compactSQL, "decimal(10,4)"), nil
 }
 
 func migrateLOGDB() error {
@@ -564,6 +647,73 @@ PRIMARY KEY (` + "`id`" + `)
 		if err := DB.Exec("ALTER TABLE `" + tableName + "` ADD COLUMN " + col.DDL).Error; err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// migrateQuotaColumnsToBigint widens persisted balances and cumulative quota
+// counters before AutoMigrate inspects the int64-backed model fields. SQLite's
+// INTEGER storage class is already a signed 64-bit value, so only MySQL and
+// PostgreSQL need schema changes.
+func migrateQuotaColumnsToBigint() error {
+	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+		return nil
+	}
+
+	columns := []struct {
+		table        string
+		column       string
+		mysqlDefault string
+	}{
+		{table: "users", column: "quota", mysqlDefault: "0"},
+		{table: "users", column: "used_quota", mysqlDefault: "0"},
+		{table: "users", column: "aff_quota", mysqlDefault: "0"},
+		{table: "users", column: "aff_history", mysqlDefault: "0"},
+		{table: "tokens", column: "remain_quota", mysqlDefault: "0"},
+		{table: "tokens", column: "used_quota", mysqlDefault: "0"},
+		{table: "redemptions", column: "quota", mysqlDefault: "100"},
+		{table: "channels", column: "used_quota", mysqlDefault: "0"},
+		{table: "quota_data", column: "quota", mysqlDefault: "0"},
+	}
+
+	for _, item := range columns {
+		if !DB.Migrator().HasTable(item.table) || !DB.Migrator().HasColumn(item.table, item.column) {
+			continue
+		}
+
+		var dataType string
+		var alterSQL string
+		switch {
+		case common.UsingMainDatabase(common.DatabaseTypePostgreSQL):
+			if err := DB.Raw(`SELECT data_type FROM information_schema.columns
+				WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`,
+				item.table, item.column).Scan(&dataType).Error; err != nil {
+				return fmt.Errorf("query quota column type %s.%s: %w", item.table, item.column, err)
+			}
+			if strings.EqualFold(dataType, "bigint") {
+				continue
+			}
+			alterSQL = fmt.Sprintf(`ALTER TABLE "%s" ALTER COLUMN "%s" TYPE BIGINT`,
+				item.table, item.column)
+		case common.UsingMainDatabase(common.DatabaseTypeMySQL):
+			if err := DB.Raw(`SELECT COLUMN_TYPE FROM information_schema.columns
+				WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+				item.table, item.column).Scan(&dataType).Error; err != nil {
+				return fmt.Errorf("query quota column type %s.%s: %w", item.table, item.column, err)
+			}
+			if strings.HasPrefix(strings.ToLower(dataType), "bigint") {
+				continue
+			}
+			alterSQL = fmt.Sprintf("ALTER TABLE `%s` MODIFY COLUMN `%s` BIGINT DEFAULT %s",
+				item.table, item.column, item.mysqlDefault)
+		default:
+			return nil
+		}
+
+		if err := DB.Exec(alterSQL).Error; err != nil {
+			return fmt.Errorf("migrate quota column %s.%s to bigint: %w", item.table, item.column, err)
+		}
+		common.SysLog(fmt.Sprintf("migrated quota column %s.%s to BIGINT", item.table, item.column))
 	}
 	return nil
 }

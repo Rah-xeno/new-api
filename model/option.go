@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -19,6 +20,11 @@ type Option struct {
 	Key   string `json:"key" gorm:"primaryKey"`
 	Value string `json:"value"`
 }
+
+const (
+	GlobalSystemPromptAppendOptionKey = "GlobalSystemPromptAppend"
+	globalSystemPromptAppendCacheKey  = "option:" + GlobalSystemPromptAppendOptionKey
+)
 
 func AllOption() ([]*Option, error) {
 	var options []*Option
@@ -69,6 +75,7 @@ func InitOptionMap() {
 	common.OptionMap["Notice"] = ""
 	common.OptionMap["About"] = ""
 	common.OptionMap["HomePageContent"] = ""
+	common.OptionMap[GlobalSystemPromptAppendOptionKey] = constant.GlobalSystemPromptAppend
 	common.OptionMap["Footer"] = common.Footer
 	common.OptionMap["SystemName"] = common.SystemName
 	common.OptionMap["Logo"] = common.Logo
@@ -130,9 +137,9 @@ func InitOptionMap() {
 	common.OptionMap["WeChatAccountQRCodeImageURL"] = ""
 	common.OptionMap["TurnstileSiteKey"] = ""
 	common.OptionMap["TurnstileSecretKey"] = ""
-	common.OptionMap["QuotaForNewUser"] = strconv.Itoa(common.QuotaForNewUser)
-	common.OptionMap["QuotaForInviter"] = strconv.Itoa(common.QuotaForInviter)
-	common.OptionMap["QuotaForInvitee"] = strconv.Itoa(common.QuotaForInvitee)
+	common.OptionMap["QuotaForNewUser"] = strconv.FormatInt(common.QuotaForNewUser, 10)
+	common.OptionMap["QuotaForInviter"] = strconv.FormatInt(common.QuotaForInviter, 10)
+	common.OptionMap["QuotaForInvitee"] = strconv.FormatInt(common.QuotaForInvitee, 10)
 	common.OptionMap["QuotaRemindThreshold"] = strconv.Itoa(common.QuotaRemindThreshold)
 	common.OptionMap["PreConsumedQuota"] = strconv.Itoa(common.PreConsumedQuota)
 	common.OptionMap["ModelRequestRateLimitCount"] = strconv.Itoa(setting.ModelRequestRateLimitCount)
@@ -146,6 +153,7 @@ func InitOptionMap() {
 	common.OptionMap["GroupRatio"] = ratio_setting.GroupRatio2JSONString()
 	common.OptionMap["GroupGroupRatio"] = ratio_setting.GroupGroupRatio2JSONString()
 	common.OptionMap["UserUsableGroups"] = setting.UserUsableGroups2JSONString()
+	common.OptionMap["SystemPromptExemptGroups"] = setting.SystemPromptExemptGroups2JSONString()
 	common.OptionMap["CompletionRatio"] = ratio_setting.CompletionRatio2JSONString()
 	common.OptionMap["ImageRatio"] = ratio_setting.ImageRatio2JSONString()
 	common.OptionMap["AudioRatio"] = ratio_setting.AudioRatio2JSONString()
@@ -193,7 +201,51 @@ func loadOptionsFromDatabase() {
 		if err != nil {
 			common.SysLog("failed to update option map: " + err.Error())
 		}
+		if option.Key == GlobalSystemPromptAppendOptionKey {
+			setGlobalSystemPromptAppendCache(option.Value)
+		}
 	}
+}
+
+func setGlobalSystemPromptAppendCache(value string) {
+	if !common.RedisEnabled || common.RDB == nil {
+		return
+	}
+	if err := common.RedisSet(globalSystemPromptAppendCacheKey, value, 0); err != nil {
+		common.SysLog("failed to cache global system prompt: " + err.Error())
+	}
+}
+
+// GetGlobalSystemPromptAppend returns the configured prompt from Redis when
+// available, then falls back to the SQL-backed option map and finally the
+// built-in prompt for databases that do not have this option yet.
+func GetGlobalSystemPromptAppend() string {
+	if common.RedisEnabled && common.RDB != nil {
+		if value, err := common.RedisGet(globalSystemPromptAppendCacheKey); err == nil {
+			return value
+		}
+	}
+
+	common.OptionMapRWMutex.RLock()
+	value, ok := common.OptionMap[GlobalSystemPromptAppendOptionKey]
+	common.OptionMapRWMutex.RUnlock()
+	if !ok {
+		value = constant.GlobalSystemPromptAppend
+	}
+	setGlobalSystemPromptAppendCache(value)
+	return value
+}
+
+// RefreshGlobalSystemPromptAppendCache overwrites any stale Redis value after
+// startup has loaded the current SQL options into memory.
+func RefreshGlobalSystemPromptAppendCache() {
+	common.OptionMapRWMutex.RLock()
+	value, ok := common.OptionMap[GlobalSystemPromptAppendOptionKey]
+	common.OptionMapRWMutex.RUnlock()
+	if !ok {
+		value = constant.GlobalSystemPromptAppend
+	}
+	setGlobalSystemPromptAppendCache(value)
 }
 
 func SyncOptions(frequency int) {
@@ -210,14 +262,24 @@ func UpdateOption(key string, value string) error {
 		Key: key,
 	}
 	// https://gorm.io/docs/update.html#Save-All-Fields
-	DB.FirstOrCreate(&option, Option{Key: key})
+	if err := DB.FirstOrCreate(&option, Option{Key: key}).Error; err != nil {
+		return err
+	}
 	option.Value = value
 	// Save is a combination function.
 	// If save value does not contain primary key, it will execute Create,
 	// otherwise it will execute Update (with all fields).
-	DB.Save(&option)
+	if err := DB.Save(&option).Error; err != nil {
+		return err
+	}
 	// Update OptionMap
-	return updateOptionMap(key, value)
+	if err := updateOptionMap(key, value); err != nil {
+		return err
+	}
+	if key == GlobalSystemPromptAppendOptionKey {
+		setGlobalSystemPromptAppendCache(value)
+	}
+	return nil
 }
 
 // UpdateOptionsBulk persists multiple key/value pairs in a single database
@@ -248,6 +310,9 @@ func UpdateOptionsBulk(values map[string]string) error {
 	for k, v := range values {
 		if err := updateOptionMap(k, v); err != nil {
 			return err
+		}
+		if k == GlobalSystemPromptAppendOptionKey {
+			setGlobalSystemPromptAppendCache(v)
 		}
 	}
 	return nil
@@ -501,11 +566,11 @@ func updateOptionMap(key string, value string) (err error) {
 	case "TurnstileSecretKey":
 		common.TurnstileSecretKey = value
 	case "QuotaForNewUser":
-		common.QuotaForNewUser, _ = strconv.Atoi(value)
+		common.QuotaForNewUser, _ = strconv.ParseInt(value, 10, 64)
 	case "QuotaForInviter":
-		common.QuotaForInviter, _ = strconv.Atoi(value)
+		common.QuotaForInviter, _ = strconv.ParseInt(value, 10, 64)
 	case "QuotaForInvitee":
-		common.QuotaForInvitee, _ = strconv.Atoi(value)
+		common.QuotaForInvitee, _ = strconv.ParseInt(value, 10, 64)
 	case "QuotaRemindThreshold":
 		common.QuotaRemindThreshold, _ = strconv.Atoi(value)
 	case "PreConsumedQuota":
@@ -532,6 +597,8 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateGroupGroupRatioByJSONString(value)
 	case "UserUsableGroups":
 		err = setting.UpdateUserUsableGroupsByJSONString(value)
+	case "SystemPromptExemptGroups":
+		err = setting.UpdateSystemPromptExemptGroupsByJSONString(value)
 	case "CompletionRatio":
 		err = ratio_setting.UpdateCompletionRatioByJSONString(value)
 	case "ModelPrice":

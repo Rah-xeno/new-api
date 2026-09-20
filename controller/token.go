@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 )
 
 func buildMaskedTokenResponse(token *model.Token) *model.Token {
@@ -20,6 +21,8 @@ func buildMaskedTokenResponse(token *model.Token) *model.Token {
 	}
 	maskedToken := *token
 	maskedToken.Key = token.GetMaskedKey()
+	maskedToken.Group = token.GetFirstGroup()
+	maskedToken.BackupGroup = token.GetBackupGroup()
 	return &maskedToken
 }
 
@@ -181,7 +184,13 @@ func AddToken(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
 			return
 		}
-		maxQuotaValue := int((1000000000 * common.QuotaPerUnit))
+		maxQuotaValue, quotaErr := common.QuotaFromDecimal64Strict(
+			decimal.NewFromInt(1_000_000_000).Mul(decimal.NewFromFloat(common.QuotaPerUnit)),
+		)
+		if quotaErr != nil {
+			common.ApiError(c, quotaErr)
+			return
+		}
 		if token.RemainQuota > maxQuotaValue {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
 			return
@@ -220,7 +229,7 @@ func AddToken(c *gin.Context) {
 		ModelLimits:        token.ModelLimits,
 		AllowIps:           token.AllowIps,
 		Group:              token.Group,
-		CrossGroupRetry:    token.CrossGroupRetry,
+		BackupGroup:        token.BackupGroup,
 	}
 	err = cleanToken.Insert()
 	if err != nil {
@@ -265,7 +274,13 @@ func UpdateToken(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
 			return
 		}
-		maxQuotaValue := int((1000000000 * common.QuotaPerUnit))
+		maxQuotaValue, quotaErr := common.QuotaFromDecimal64Strict(
+			decimal.NewFromInt(1_000_000_000).Mul(decimal.NewFromFloat(common.QuotaPerUnit)),
+		)
+		if quotaErr != nil {
+			common.ApiError(c, quotaErr)
+			return
+		}
 		if token.RemainQuota > maxQuotaValue {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
 			return
@@ -298,7 +313,7 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.ModelLimits = token.ModelLimits
 		cleanToken.AllowIps = token.AllowIps
 		cleanToken.Group = token.Group
-		cleanToken.CrossGroupRetry = token.CrossGroupRetry
+		cleanToken.BackupGroup = token.BackupGroup
 	}
 	err = cleanToken.Update()
 	if err != nil {

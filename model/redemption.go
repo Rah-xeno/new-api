@@ -6,8 +6,11 @@ import (
 	"strconv"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dev"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -17,7 +20,7 @@ type Redemption struct {
 	Key          string         `json:"key" gorm:"type:char(32);uniqueIndex"`
 	Status       int            `json:"status" gorm:"default:1"`
 	Name         string         `json:"name" gorm:"index"`
-	Quota        int            `json:"quota" gorm:"default:100"`
+	Quota        int64          `json:"quota" gorm:"default:100"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
 	RedeemedTime int64          `json:"redeemed_time" gorm:"bigint"`
 	Count        int            `json:"count" gorm:"-:all"` // only for api request
@@ -75,9 +78,9 @@ func SearchRedemptions(keyword string, status string, startIdx int, num int) (re
 
 	if keyword != "" {
 		if id, err := strconv.Atoi(keyword); err == nil {
-			query = query.Where("id = ? OR name LIKE ?", id, keyword+"%")
+			query = query.Where("id = ? OR name LIKE ? OR "+commonKeyCol+" = ?", id, keyword+"%", keyword)
 		} else {
-			query = query.Where("name LIKE ?", keyword+"%")
+			query = query.Where("name LIKE ? OR "+commonKeyCol+" = ?", keyword+"%", keyword)
 		}
 	}
 
@@ -134,7 +137,7 @@ func GetRedemptionById(id int) (*Redemption, error) {
 	return &redemption, err
 }
 
-func Redeem(key string, userId int) (quota int, err error) {
+func Redeem(key string, userId int) (quota int64, err error) {
 	if key == "" {
 		return 0, errors.New("未提供兑换码")
 	}
@@ -142,11 +145,19 @@ func Redeem(key string, userId int) (quota int, err error) {
 		return 0, errors.New("无效的 user id")
 	}
 	redemption := &Redemption{}
+	var agentCommissionOutcome *AgentCommissionOutcome
 
 	keyCol := "`key`"
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
 		keyCol = `"key"`
 	}
+
+	// Get user group for TopupGroupRatio
+	userGroup, groupErr := GetUserGroup(userId, false)
+	if groupErr != nil {
+		userGroup = "default"
+	}
+	topupRatio := common.GetTopupGroupRatio(userGroup)
 	common.RandomSleep()
 	err = DB.Transaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(keyCol+" = ?", key).First(redemption).Error
@@ -158,6 +169,16 @@ func Redeem(key string, userId int) (quota int, err error) {
 		}
 		if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
 			return errors.New("该兑换码已过期")
+		}
+		// Apply TopupGroupRatio to calculate actual quota
+		actualQuota, quotaErr := common.QuotaFromDecimal64Strict(
+			decimal.NewFromInt(redemption.Quota).Mul(decimal.NewFromFloat(topupRatio)),
+		)
+		if quotaErr != nil {
+			return quotaErr
+		}
+		if actualQuota <= 0 {
+			return errors.New("无效的兑换额度")
 		}
 		// Compare-and-swap on status: only the transaction that flips
 		// enabled -> used may credit quota, so a concurrent redeem of the
@@ -175,14 +196,57 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if result.RowsAffected == 0 {
 			return errors.New("该兑换码已被使用")
 		}
-		return tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", redemption.Quota)).Error
+		if err := tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", actualQuota)).Error; err != nil {
+			return err
+		}
+		// Invite reward: grant reward to inviter based on invite plans
+		inviterId := 0
+		inviteeName := ""
+		var inviteeCreatedAt int64
+		var invitee User
+		if userErr := lockForUpdate(tx).Where("id = ?", userId).First(&invitee).Error; userErr == nil {
+			inviterId = invitee.InviterId
+			inviteeName = invitee.Username
+			inviteeCreatedAt = invitee.CreatedAt
+			if NormalizeReferralMode(invitee.ReferralMode) == ReferralModeAgentDistribution {
+				sourceAmountCents := int64(0)
+				if common.QuotaPerUnit > 0 && operation_setting.Price > 0 {
+					sourceAmountCents = decimal.NewFromInt(actualQuota).Div(decimal.NewFromFloat(common.QuotaPerUnit)).Mul(decimal.NewFromFloat(operation_setting.Price)).Mul(decimal.NewFromInt(100)).Round(0).IntPart()
+				}
+				userErr = tx.Transaction(func(commissionTx *gorm.DB) error {
+					var commissionErr error
+					agentCommissionOutcome, commissionErr = HandleAgentCommissionForRedemptionTx(commissionTx, userId, key, sourceAmountCents)
+					return commissionErr
+				})
+				if userErr != nil {
+					agentCommissionOutcome = nil
+					common.SysError("agent commission for redemption failed: " + userErr.Error())
+				}
+				return nil
+			}
+		}
+		if _, rewardErr := dev.HandleInviteRewardForPayment(tx, userId, inviterId, inviteeName, inviteeCreatedAt, dev.InvitePlanTriggerRedemption, key, actualQuota, func(uid int, msg string) {
+			RecordLog(uid, LogTypeTopup, msg)
+		}); rewardErr != nil {
+			common.SysError("invite reward for redemption failed: " + rewardErr.Error())
+			// Non-fatal: don't roll back the redemption
+		}
+		return nil
 	})
 	if err != nil {
 		common.SysError("redemption failed: " + err.Error())
 		return 0, ErrRedeemFailed
 	}
-	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
-	return redemption.Quota, nil
+	ApplyAgentCommissionSideEffects(agentCommissionOutcome)
+	actualQuota, err := common.QuotaFromDecimal64Strict(
+		decimal.NewFromInt(redemption.Quota).Mul(decimal.NewFromFloat(topupRatio)),
+	)
+	if err != nil {
+		common.SysError("redemption quota conversion failed: " + err.Error())
+		return 0, ErrRedeemFailed
+	}
+	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(actualQuota), redemption.Id))
+	return actualQuota, nil
 }
 
 func (redemption *Redemption) Insert() error {

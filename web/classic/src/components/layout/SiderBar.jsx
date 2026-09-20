@@ -36,6 +36,7 @@ const routerMap = {
   token: '/console/token',
   redemption: '/console/redemption',
   topup: '/console/topup',
+  agentDistribution: '/console/distribution',
   user: '/console/user',
   subscription: '/console/subscription',
   log: '/console/log',
@@ -57,6 +58,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
   const {
     isModuleVisible,
     hasSectionVisibleModules,
+    currentUser,
     loading: sidebarLoading,
   } = useSidebar();
 
@@ -130,6 +132,11 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         to: '/topup',
       },
       {
+        text: t('代理分销'),
+        itemKey: 'agentDistribution',
+        to: '/console/distribution',
+      },
+      {
         text: t('个人设置'),
         itemKey: 'personal',
         to: '/personal',
@@ -138,12 +145,18 @@ const SiderBar = ({ onNavigate = () => {} }) => {
 
     // 根据配置过滤项目
     const filteredItems = items.filter((item) => {
+      if (
+        item.itemKey === 'agentDistribution' &&
+        !currentUser?.agent_portal_visible
+      ) {
+        return false;
+      }
       const configVisible = isModuleVisible('personal', item.itemKey);
       return configVisible;
     });
 
     return filteredItems;
-  }, [t, isModuleVisible]);
+  }, [currentUser?.agent_portal_visible, t, isModuleVisible]);
 
   const adminItems = useMemo(() => {
     const items = [

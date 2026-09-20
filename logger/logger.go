@@ -119,9 +119,14 @@ func logHelper(ctx context.Context, level string, msg string) {
 	}
 }
 
-func LogQuota(quota int) string {
+type quotaValue interface {
+	~int | ~int64
+}
+
+func LogQuota[T quotaValue](quota T) string {
 	// 新逻辑：根据额度展示类型输出
-	q := float64(quota)
+	quotaInt64 := int64(quota)
+	q := float64(quotaInt64)
 	switch operation_setting.GetQuotaDisplayType() {
 	case operation_setting.QuotaDisplayTypeCNY:
 		usd := q / common.QuotaPerUnit
@@ -140,14 +145,15 @@ func LogQuota(quota int) string {
 		v := usd * rate
 		return fmt.Sprintf("%s%.6f 额度", symbol, v)
 	case operation_setting.QuotaDisplayTypeTokens:
-		return fmt.Sprintf("%d 点额度", quota)
+		return fmt.Sprintf("%d 点额度", quotaInt64)
 	default: // USD
 		return fmt.Sprintf("＄%.6f 额度", q/common.QuotaPerUnit)
 	}
 }
 
-func FormatQuota(quota int) string {
-	q := float64(quota)
+func FormatQuota[T quotaValue](quota T) string {
+	quotaInt64 := int64(quota)
+	q := float64(quotaInt64)
 	switch operation_setting.GetQuotaDisplayType() {
 	case operation_setting.QuotaDisplayTypeCNY:
 		usd := q / common.QuotaPerUnit
@@ -166,7 +172,7 @@ func FormatQuota(quota int) string {
 		v := usd * rate
 		return fmt.Sprintf("%s%.6f", symbol, v)
 	case operation_setting.QuotaDisplayTypeTokens:
-		return fmt.Sprintf("%d", quota)
+		return fmt.Sprintf("%d", quotaInt64)
 	default:
 		return fmt.Sprintf("＄%.6f", q/common.QuotaPerUnit)
 	}

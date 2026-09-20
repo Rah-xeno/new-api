@@ -18,10 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   Activity,
+  BarChart3,
+  BadgePercent,
   Box,
   CreditCard,
   FileText,
   FlaskConical,
+  Gift,
   Key,
   LayoutDashboard,
   ListTodo,
@@ -36,8 +39,9 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { type SidebarData } from '@/components/layout/types'
+import type { SidebarData } from '@/components/layout/types'
 import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 /**
  * Root navigation groups for the application sidebar.
@@ -47,6 +51,9 @@ import { ROLE } from '@/lib/roles'
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
+  const agentPortalVisible = useAuthStore(
+    (state) => state.auth.user?.agent_portal_visible === true
+  )
 
   return {
     navGroups: [
@@ -109,6 +116,20 @@ export function useSidebarData(): SidebarData {
             icon: Wallet,
           },
           {
+            title: t('Invite'),
+            url: '/invite',
+            icon: Gift,
+          },
+          ...(agentPortalVisible
+            ? [
+                {
+                  title: t('Agent Distribution'),
+                  url: '/agent-distribution',
+                  icon: BadgePercent,
+                },
+              ]
+            : []),
+          {
             title: t('Profile'),
             url: '/profile',
             icon: User,
@@ -123,6 +144,11 @@ export function useSidebarData(): SidebarData {
             title: t('Channels'),
             url: '/channels',
             icon: Radio,
+          },
+          {
+            title: t('Data analytics'),
+            url: '/analytics',
+            icon: BarChart3,
           },
           {
             title: t('Models'),

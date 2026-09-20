@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -48,6 +49,20 @@ func TestSearchRedemptionsFiltersAndPaginates(t *testing.T) {
 			num:       10,
 			wantTotal: 3,
 			wantIds:   []int{3, 2, 1},
+		},
+		{
+			name:      "keyword matches an exact redemption code",
+			keyword:   "00000000000000000000000000000004",
+			num:       10,
+			wantTotal: 1,
+			wantIds:   []int{4},
+		},
+		{
+			name:      "partial redemption code does not match",
+			keyword:   "0000000000000000000000000000000",
+			num:       10,
+			wantTotal: 0,
+			wantIds:   []int{},
 		},
 		{
 			name:      "enabled status excludes expired rows",
@@ -100,7 +115,7 @@ func TestSearchRedemptionsFiltersAndPaginates(t *testing.T) {
 	}
 }
 
-func setupRedeemFixture(t *testing.T, quota int) (userId int, key string) {
+func setupRedeemFixture(t *testing.T, quota int64) (userId int, key string) {
 	t.Helper()
 	require.NoError(t, DB.AutoMigrate(&Redemption{}))
 	require.NoError(t, DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Unscoped().Delete(&Redemption{}).Error)
@@ -130,11 +145,11 @@ func TestRedeemCreditsQuotaExactlyOnce(t *testing.T) {
 
 	quota, err := Redeem(key, userId)
 	require.NoError(t, err)
-	assert.Equal(t, 500, quota)
+	assert.Equal(t, int64(500), quota)
 
 	var user User
 	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
-	assert.Equal(t, 500, user.Quota)
+	assert.Equal(t, int64(500), user.Quota)
 
 	var redemption Redemption
 	require.NoError(t, DB.First(&redemption, "name = ?", "redeem-test").Error)
@@ -145,7 +160,20 @@ func TestRedeemCreditsQuotaExactlyOnce(t *testing.T) {
 	_, err = Redeem(key, userId)
 	require.Error(t, err)
 	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
-	assert.Equal(t, 500, user.Quota)
+	assert.Equal(t, int64(500), user.Quota)
+}
+
+func TestRedeemCreditsQuotaBeyondInt32(t *testing.T) {
+	const redemptionQuota int64 = 2_500_000_000
+	userId, key := setupRedeemFixture(t, redemptionQuota)
+
+	quota, err := Redeem(key, userId)
+	require.NoError(t, err)
+	assert.Equal(t, redemptionQuota, quota)
+
+	var user User
+	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
+	assert.Equal(t, redemptionQuota, user.Quota)
 }
 
 // Exactly one of several concurrent redeems of the same code may win, and
@@ -177,5 +205,49 @@ func TestRedeemConcurrentSingleSuccess(t *testing.T) {
 
 	var user User
 	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
-	assert.Equal(t, 300, user.Quota, "quota must be credited exactly once")
+	assert.Equal(t, int64(300), user.Quota, "quota must be credited exactly once")
+}
+
+func TestRedeemStillSucceedsWhenAgentCommissionFails(t *testing.T) {
+	const redemptionQuota int64 = 5_000_000
+	userId, key := setupRedeemFixture(t, redemptionQuota)
+
+	agent := &User{
+		Username:             "redeem-agent",
+		AffCode:              "redeem-agent-code",
+		Password:             "password",
+		Status:               common.UserStatusEnabled,
+		AgentEnabled:         true,
+		AgentUseDefaultRates: false,
+		AgentFirstTopupRate:  10,
+		AgentRepeatTopupRate: 5,
+	}
+	require.NoError(t, DB.Create(agent).Error)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", userId).Updates(map[string]interface{}{
+		"inviter_id":    agent.Id,
+		"referral_mode": ReferralModeAgentDistribution,
+	}).Error)
+
+	// A failing trigger simulates a commission-only database error.
+	// The nested savepoint must isolate it so the redemption itself can commit.
+	require.NoError(t, DB.Exec(`
+		CREATE TRIGGER fail_agent_commission
+		BEFORE UPDATE OF agent_commission_balance ON users
+		WHEN NEW.id = `+fmt.Sprint(agent.Id)+`
+		BEGIN
+			SELECT RAISE(ABORT, 'forced commission failure');
+		END
+	`).Error)
+	t.Cleanup(func() {
+		require.NoError(t, DB.Exec("DROP TRIGGER IF EXISTS fail_agent_commission").Error)
+	})
+
+	quota, err := Redeem(key, userId)
+	require.NoError(t, err)
+	assert.Equal(t, redemptionQuota, quota)
+
+	var user User
+	require.NoError(t, DB.First(&user, userId).Error)
+	assert.Equal(t, redemptionQuota, user.Quota)
+	assert.Zero(t, user.FirstPaymentAt, "failed commission work should be rolled back to its savepoint")
 }

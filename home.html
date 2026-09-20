@@ -1,0 +1,867 @@
+<div class="mt-[60px]">
+    <style>
+        .jq-page {
+            --bg: #f7fbff;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: rgba(37, 99, 235, 0.14);
+            --card: rgba(255, 255, 255, 0.78);
+            --blue: #2563eb;
+            --cyan: #0ea5e9;
+            --teal: #14b8a6;
+            --green: #22c55e;
+            --shadow: 0 22px 60px rgba(15, 23, 42, 0.1);
+        }
+
+        .jq-page,
+        .jq-page * {
+            box-sizing: border-box;
+        }
+
+        body:has(> .jq-page) {
+            margin: 0;
+        }
+
+        .jq-page {
+            position: relative;
+            width: 100vw;
+            min-height: 100vh;
+            margin-right: calc(50% - 50vw);
+            margin-left: calc(50% - 50vw);
+            overflow: hidden;
+            color: var(--ink);
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display",
+                "PingFang SC", "Microsoft YaHei", sans-serif;
+            background-image:
+
+                radial-gradient(circle at 72% 18%, rgba(14, 165, 233, 0.18), transparent 28%),
+                radial-gradient(circle at 20% 78%, rgba(20, 184, 166, 0.12), transparent 24%),
+                linear-gradient(135deg, #ffffff 0%, #f7fbff 48%, #eaf8ff 100%);
+        }
+
+        .jq-page::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(rgba(14, 165, 233, 0.045) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(14, 165, 233, 0.045) 1px, transparent 1px);
+            background-size: 56px 56px;
+            opacity: 0.75;
+            pointer-events: none;
+        }
+
+        .jq-bg-tokens {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .jq-token-track {
+            position: absolute;
+            left: -8%;
+            width: 116%;
+            height: 42px;
+            opacity: 0.68;
+        }
+
+        .jq-token-track::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.62), rgba(14, 165, 233, 0.16), transparent);
+        }
+
+        .jq-token-track::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: calc(50% - 2px);
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 0 14px rgba(14, 165, 233, 0.24);
+            transform: translateX(-80px);
+            animation: tokenDotMove 13s linear infinite;
+        }
+
+        .jq-token-packet {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-width: 86px;
+            height: 30px;
+            padding: 0 11px;
+            border: 1px solid rgba(14, 165, 233, 0.16);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.82);
+            color: rgba(15, 23, 42, 0.66);
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.08);
+            font-size: 11px;
+            font-weight: 820;
+            transform: translate3d(-120px, -50%, 0);
+            animation: tokenMove 13s linear infinite;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .jq-token-track:nth-child(2)::after {
+            animation-delay: -5s;
+        }
+
+        .jq-token-track:nth-child(3)::after {
+            animation-delay: -8s;
+        }
+
+        .jq-token-track:nth-child(4)::after {
+            animation-delay: -11s;
+        }
+
+        .jq-token-packet::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.1);
+        }
+
+        .jq-shell {
+            position: relative;
+            z-index: 1;
+            width: min(1360px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 24px 0 34px;
+        }
+
+        .jq-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            justify-items: center;
+            min-height: calc(100vh - 104px);
+            padding: 54px 0 30px;
+            text-align: center;
+        }
+
+        .jq-copy {
+            width: min(980px, 100%);
+            animation: rise 680ms ease-out both;
+        }
+
+        .jq-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 0 18px;
+            padding: 7px 11px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.68);
+            color: #127cab;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .jq-kicker::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.12);
+        }
+
+        .jq-title {
+            margin: 0;
+            color: #de6053;
+            font-size: clamp(52px, 7.4vw, 108px);
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: 0;
+        }
+
+        .jq-title span {
+            color: transparent;
+            background: linear-gradient(135deg, var(--blue), var(--cyan), var(--teal));
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .jq-subtitle {
+            width: min(820px, 100%);
+            margin: 24px auto 0;
+            color: #68b1fa;
+            font-size: clamp(18px, 2vw, 24px);
+            font-weight: 600;
+            line-height: 1.75;
+        }
+
+        .jq-subtitle span {
+            display: block;
+        }
+
+        .jq-trust {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        .jq-trust-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 34px;
+            padding: 0 14px;
+            border: 1px solid rgba(37, 99, 235, 0.12);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.68);
+            color: #385b78;
+            font-size: 14px;
+            font-weight: 720;
+        }
+
+        .jq-trust-item::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+        }
+
+        .jq-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 18px;
+            margin-top: 34px;
+            background: rgba(255, 255, 255, 0.76);
+            -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+            border-radius: 16px;
+        }
+
+        .jq-btn {
+            --line_color: #2563eb;
+            --back_color: rgba(37, 99, 235, 0.16);
+            position: relative;
+            z-index: 0;
+            display: block;
+            width: 154px;
+            height: 52px;
+            border: 0;
+            background: transparent;
+            color: var(--line_color);
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0;
+            transition: transform 0.2s ease, letter-spacing 0.3s ease;
+            cursor: pointer;
+        }
+
+        .jq-btn:hover {
+            transform: translateY(-2px);
+            letter-spacing: 1px;
+        }
+
+        .jq-btn--primary {
+            --line_color: #0ea5e9;
+            --back_color: rgba(14, 165, 233, 0.24);
+        }
+
+        .jq-btn-anim__text {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            white-space: nowrap;
+        }
+
+        .jq-btn-anim::before,
+        .jq-btn-anim::after,
+        .jq-btn-anim__text::before,
+        .jq-btn-anim__text::after {
+            content: "";
+            position: absolute;
+            height: 3px;
+            border-radius: 2px;
+            background: var(--line_color);
+            transition: all 0.5s ease;
+        }
+
+        .jq-btn-anim::before {
+            top: 0;
+            left: 50px;
+            width: calc(100% - 116px);
+        }
+
+        .jq-btn-anim::after {
+            top: 0;
+            right: 50px;
+            width: 8px;
+        }
+
+        .jq-btn-anim__text::before {
+            right: 50px;
+            bottom: 0;
+            width: calc(100% - 116px);
+        }
+
+        .jq-btn-anim__text::after {
+            bottom: 0;
+            left: 50px;
+            width: 8px;
+        }
+
+        .jq-btn-anim:hover::before,
+        .jq-btn-anim:hover .jq-btn-anim__text::before {
+            width: 8px;
+        }
+
+        .jq-btn-anim:hover::after,
+        .jq-btn-anim:hover .jq-btn-anim__text::after {
+            width: calc(100% - 116px);
+        }
+
+        .jq-btn-anim__line {
+            position: absolute;
+            top: 0;
+            width: 52px;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .jq-btn-anim__line::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            width: 150%;
+            height: 100%;
+            box-sizing: border-box;
+            border: solid 3px var(--line_color);
+            border-radius: 300px;
+        }
+
+        .jq-btn-anim__line:nth-child(1),
+        .jq-btn-anim__line:nth-child(1)::before {
+            left: 0;
+        }
+
+        .jq-btn-anim__line:nth-child(2),
+        .jq-btn-anim__line:nth-child(2)::before {
+            right: 0;
+        }
+
+        .jq-btn-anim__drow1,
+        .jq-btn-anim__drow2 {
+            position: absolute;
+            z-index: -1;
+            inset: -8px 5px -8px 5px;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .jq-btn-anim__drow2 {
+            display: none;
+        }
+
+        .jq-btn-anim:hover .jq-btn-anim__drow1 {
+            animation: drowShow 0.12s ease-out forwards;
+        }
+
+        .jq-btn-anim:hover .jq-btn-anim__drow2 {
+            animation: drowShow 0.12s ease-out forwards;
+        }
+
+        .jq-btn-anim__stroke {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        .jq-btn-anim__stroke path {
+            fill: none;
+            stroke: var(--back_color);
+            stroke-width: 14;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 230;
+            stroke-dashoffset: 230;
+            filter: drop-shadow(0 4px 8px rgba(14, 165, 233, 0.1));
+        }
+
+        .jq-btn-anim:hover .jq-btn-anim__stroke path {
+            animation: drawStroke 0.42s ease-out forwards;
+        }
+
+        .jq-btn-anim__drow2 .jq-btn-anim__stroke path {
+            animation-delay: 0.08s;
+            opacity: 0.72;
+            transform: translateY(6px);
+        }
+
+        .jq-status {
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 14px;
+            width: min(760px, 100%);
+            min-height: 82px;
+            margin: 38px auto 0;
+            padding: 14px 18px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.76);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            text-align: left;
+        }
+
+        .jq-status::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            width: 34%;
+            background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.14), transparent);
+            animation: scan 4.8s linear infinite;
+        }
+
+        .jq-status-icon {
+            position: relative;
+            display: grid;
+            place-items: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: rgba(14, 165, 233, 0.1);
+            color: var(--blue);
+            font-weight: 900;
+        }
+
+        .jq-status-main,
+        .jq-status-badge {
+            position: relative;
+        }
+
+        .jq-status-main strong {
+            display: block;
+            color: var(--ink);
+            font-size: 17px;
+            font-weight: 840;
+        }
+
+        .jq-status-main span {
+            display: block;
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .jq-status-meta {
+            position: relative;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 9px;
+        }
+
+        .jq-status-meta span {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 0 8px;
+            border-radius: 999px;
+            background: rgba(14, 165, 233, 0.08);
+            color: #33718f;
+            font-size: 12px;
+            font-weight: 720;
+        }
+
+        .jq-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(34, 197, 94, 0.1);
+            color: #15803d;
+            font-size: 12px;
+            font-weight: 820;
+            white-space: nowrap;
+        }
+
+        .jq-status-badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+        }
+
+        .jq-cards {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+            width: 100%;
+            margin-top: auto;
+            padding-top: 56px;
+        }
+
+        .jq-card {
+            min-height: 104px;
+            padding: 22px 20px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.68);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+            text-align: left;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .jq-card strong {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--ink);
+            font-size: 17px;
+            font-weight: 840;
+        }
+
+        .jq-card span {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.55;
+            font-weight: 560;
+            white-space: nowrap;
+        }
+
+        @keyframes rise {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes jqBgRise {
+            from {
+                background-position:
+                    center 0,
+                    center 100vh,
+                    0 0,
+                    0 0,
+                    0 0;
+            }
+
+            to {
+                background-position:
+                    center -100vh,
+                    center 0,
+                    0 0,
+                    0 0,
+                    0 0;
+            }
+        }
+
+        @keyframes scan {
+            from {
+                transform: translateX(-120%);
+            }
+
+            to {
+                transform: translateX(360%);
+            }
+        }
+
+        @keyframes tokenMove {
+            0% {
+                opacity: 0;
+                transform: translate3d(-140px, -50%, 0);
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            88% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate3d(calc(100vw + 180px), -50%, 0);
+            }
+        }
+
+        @keyframes tokenDotMove {
+            0% {
+                opacity: 0;
+                transform: translateX(-80px);
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            88% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateX(calc(100vw + 120px));
+            }
+        }
+
+        @keyframes drowShow {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes drawStroke {
+            from {
+                stroke-dashoffset: 230;
+            }
+
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            .jq-copy,
+            .jq-page,
+            .jq-status::before,
+            .jq-token-packet,
+            .jq-btn-anim__drow1,
+            .jq-btn-anim__drow2 {
+                animation: none !important;
+            }
+        }
+
+        @media (max-width: 860px) {
+            .jq-hero {
+                padding-top: 68px;
+            }
+
+            .jq-cards {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .jq-card span {
+                white-space: normal;
+            }
+        }
+
+        @media (max-width: 560px) {
+            .jq-shell {
+                width: calc(100% - 32px);
+                padding-top: 18px;
+            }
+
+            .jq-title {
+                font-size: 44px;
+
+            }
+
+            .jq-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .jq-btn {
+                width: 100%;
+                height: 48px;
+                font-size: 13px;
+            }
+
+            .jq-btn--primary {
+                grid-column: span 2;
+            }
+
+            .jq-status {
+                grid-template-columns: auto 1fr;
+            }
+
+            .jq-status-badge {
+                grid-column: 1 / -1;
+                justify-self: start;
+            }
+
+            .jq-trust {
+                justify-content: flex-start;
+                text-align: left;
+            }
+
+            .jq-cards {
+                grid-template-columns: 1fr;
+                gap: 10px;
+                padding-top: 34px;
+            }
+        }
+    </style>
+
+    <div class="jq-page">
+        <div class="jq-bg-tokens" aria-hidden="true">
+            <div class="jq-token-track" style="top: 18%;">
+                <span class="jq-token-packet" style="animation-delay: -1s;">token</span>
+            </div>
+            <div class="jq-token-track" style="top: 34%;">
+                <span class="jq-token-packet" style="animation-delay: -5s;">token</span>
+            </div>
+            <div class="jq-token-track" style="top: 55%;">
+                <span class="jq-token-packet" style="animation-delay: -8s;">token</span>
+            </div>
+            <div class="jq-token-track" style="top: 72%;">
+                <span class="jq-token-packet" style="animation-delay: -11s;">token</span>
+            </div>
+        </div>
+        <div class="jq-shell">
+            <div class="jq-hero" role="main">
+                <section class="jq-copy" aria-label="LINKBUS API 首页">
+                    <p class="jq-kicker">AI API TOKEN SERVICE</p>
+                    <h1 class="jq-title">LINKBUS API <span>Token</span></h1>
+                    <p class="jq-subtitle">
+                        <span>你的想法，值得实现。</span>
+                        <span>别让接入、额度和调用问题卡住进度，把时间留给真正要做成的产品。</span>
+                    </p>
+
+                    <div class="jq-trust" aria-label="信任承诺">
+                        <span class="jq-trust-item">直连稳定通道</span>
+                        <span class="jq-trust-item">纯血模型接入</span>
+                        <span class="jq-trust-item">文档与售后群支持</span>
+                    </div>
+
+                    <div class="jq-actions">
+                        <a class="jq-btn jq-btn--primary jq-btn-anim" href="/dashboard/overview">
+                            <span class="jq-btn-anim__line"></span>
+                            <span class="jq-btn-anim__line"></span>
+                            <span class="jq-btn-anim__text">开始使用</span>
+                            <span class="jq-btn-anim__drow1">
+                                <svg class="jq-btn-anim__stroke" viewBox="0 0 154 68" preserveAspectRatio="none">
+                                    <path d="M12 45 L24 18 L38 49 L52 18 L66 49 L82 20 L98 47 L116 21 L138 43"></path>
+                                </svg>
+                            </span>
+                            <span class="jq-btn-anim__drow2">
+                                <svg class="jq-btn-anim__stroke" viewBox="0 0 154 68" preserveAspectRatio="none">
+                                    <path d="M12 45 L24 18 L38 49 L52 18 L66 49 L82 20 L98 47 L116 21 L138 43"></path>
+                                </svg>
+                            </span>
+                        </a>
+                        <a class="jq-btn jq-btn-anim" href="/sign-in">
+                            <span class="jq-btn-anim__line"></span>
+                            <span class="jq-btn-anim__line"></span>
+                            <span class="jq-btn-anim__text">登录注册</span>
+                            <span class="jq-btn-anim__drow1">
+                                <svg class="jq-btn-anim__stroke" viewBox="0 0 154 68" preserveAspectRatio="none">
+                                    <path d="M12 45 L24 18 L38 49 L52 18 L66 49 L82 20 L98 47 L116 21 L138 43"></path>
+                                </svg>
+                            </span>
+                            <span class="jq-btn-anim__drow2">
+                                <svg class="jq-btn-anim__stroke" viewBox="0 0 154 68" preserveAspectRatio="none">
+                                    <path d="M12 45 L24 18 L38 49 L52 18 L66 49 L82 20 L98 47 L116 21 L138 43"></path>
+                                </svg>
+                            </span>
+                        </a>
+                        <a class="jq-btn jq-btn-anim"
+                            href="https://mcni8paw3pih.feishu.cn/wiki/GlHqwopx7ihT6JkFqtscn25inoX?renamingWikiNode=true"
+                            target="_blank" rel="noopener noreferrer">
+                            <span class="jq-btn-anim__line"></span>
+                            <span class="jq-btn-anim__line"></span>
+                            <span class="jq-btn-anim__text">使用文档</span>
+                            <span class="jq-btn-anim__drow1">
+                                <svg class="jq-btn-anim__stroke" viewBox="0 0 154 68" preserveAspectRatio="none">
+                                    <path d="M12 45 L24 18 L38 49 L52 18 L66 49 L82 20 L98 47 L116 21 L138 43"></path>
+                                </svg>
+                            </span>
+                            <span class="jq-btn-anim__drow2">
+                                <svg class="jq-btn-anim__stroke" viewBox="0 0 154 68" preserveAspectRatio="none">
+                                    <path d="M12 45 L24 18 L38 49 L52 18 L66 49 L82 20 L98 47 L116 21 L138 43"></path>
+                                </svg>
+                            </span>
+                        </a>
+                        <a class="jq-btn jq-btn-anim"
+                            href="https://qun.qq.com/universal-share/share?ac=1&authKey=v0L8Imk6RPU1ZDghwBVMXBLTrFJvxoXv0SBwFnho5j1Bip3i%2BuiVJBS5FOPMO3mj&busi_data=eyJncm91cENvZGUiOiI1MTYzODMzNDgiLCJ0b2tlbiI6IkJNYWdneHlOWW80VmFvMmloakJPUGlwT1pWTERRSGYyUmttZXo4ZTI1b2JjT3U0dzk5WDhpMmcwTzlFZElGYVkiLCJ1aW4iOiI4MzkxNzM3NjgifQ%3D%3D&data=5vaIKqIR3VaE6_mr5kT9AhUhBdvwQM6tmcfCKhTWSbXMT9tCL8aqLCwBEamBpsuN3cJPPuPikS8vrC2OBJzGhw&svctype=4&tempid=h5_group_info"
+                            target="_blank" rel="noopener noreferrer">
+                            <span class="jq-btn-anim__line"></span>
+                            <span class="jq-btn-anim__line"></span>
+                            <span class="jq-btn-anim__text">售后 QQ 群</span>
+                            <span class="jq-btn-anim__drow1">
+                                <svg class="jq-btn-anim__stroke" viewBox="0 0 154 68" preserveAspectRatio="none">
+                                    <path d="M12 45 L24 18 L38 49 L52 18 L66 49 L82 20 L98 47 L116 21 L138 43"></path>
+                                </svg>
+                            </span>
+                            <span class="jq-btn-anim__drow2">
+                                <svg class="jq-btn-anim__stroke" viewBox="0 0 154 68" preserveAspectRatio="none">
+                                    <path d="M12 45 L24 18 L38 49 L52 18 L66 49 L82 20 L98 47 L116 21 L138 43"></path>
+                                </svg>
+                            </span>
+                        </a>
+                    </div>
+
+                    <div class="jq-status" aria-label="API 状态">
+                        <div class="jq-status-icon">API</div>
+                        <div class="jq-status-main">
+                            <strong>服务运行中，API 入口可用</strong>
+                            <span>统一 Token 管理 · 主流模型兼容 · 稳定转发</span>
+                            <div class="jq-status-meta">
+                                <span>余额可查</span>
+                                <span>用量透明</span>
+                                <span>问题可反馈</span>
+                            </div>
+                        </div>
+                        <div class="jq-status-badge">Online</div>
+                    </div>
+                </section>
+
+                <section class="jq-cards" aria-label="服务特性">
+                    <div class="jq-card">
+                        <strong>稳定转发</strong>
+                        <span>面向 API Token 调用场景，保持入口稳定。</span>
+                    </div>
+                    <div class="jq-card">
+                        <strong>低延迟响应</strong>
+                        <span>优选直连线路，适合编程与自动化任务。</span>
+                    </div>
+                    <div class="jq-card">
+                        <strong>兼容接入</strong>
+                        <span>贴近主流 API 调用格式，降低迁移成本。</span>
+                    </div>
+                    <div class="jq-card">
+                        <strong>售后支持</strong>
+                        <span>文档与 QQ 群同步服务，反馈路径清晰。</span>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>

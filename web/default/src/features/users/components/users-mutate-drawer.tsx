@@ -61,6 +61,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import {
   ADMIN_PERMISSION_ACTIONS,
@@ -155,6 +156,7 @@ export function UsersMutateDrawer({
   const selectedRole = form.watch('role')
   const canEditAdminPermissions = currentUser?.role === ROLE.SUPER_ADMIN
   const targetIsAdmin = (selectedRole ?? currentRow?.role ?? 0) >= ROLE.ADMIN
+  const useDefaultAgentRates = form.watch('agent_use_default_rates')
 
   const onSubmit = async (data: UserFormValues) => {
     if (!isUpdate) {
@@ -447,6 +449,111 @@ export function UsersMutateDrawer({
                       </FormItem>
                     )}
                   />
+                </SideDrawerSection>
+              )}
+
+              {isUpdate && (
+                <SideDrawerSection>
+                  <h3 className='text-sm font-medium'>
+                    {t('Agent Distribution')}
+                  </h3>
+                  <p className='text-muted-foreground text-xs'>
+                    {t(
+                      'Enable the agent portal and configure first and repeat top-up commission rates.'
+                    )}
+                  </p>
+                  <FormField
+                    control={form.control}
+                    name='agent_enabled'
+                    render={({ field }) => (
+                      <FormItem className='flex items-center justify-between rounded-md border p-3'>
+                        <div>
+                          <FormLabel>{t('Enable agent')}</FormLabel>
+                          <FormDescription>
+                            {t(
+                              'The user can access the agent distribution portal and invite agent customers.'
+                            )}
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='agent_use_default_rates'
+                    render={({ field }) => (
+                      <FormItem className='flex items-center justify-between rounded-md border p-3'>
+                        <div>
+                          <FormLabel>{t('Use system default rates')}</FormLabel>
+                          <FormDescription>
+                            {t(
+                              'Use the default agent rates configured in billing settings.'
+                            )}
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  {!useDefaultAgentRates && (
+                    <div className='grid gap-4 sm:grid-cols-2'>
+                      <FormField
+                        control={form.control}
+                        name='agent_first_topup_rate'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('First top-up rate (%)')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type='number'
+                                min={0}
+                                max={100}
+                                step='0.01'
+                                {...field}
+                                onChange={(event) =>
+                                  field.onChange(event.target.valueAsNumber)
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name='agent_repeat_topup_rate'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('Repeat top-up rate (%)')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type='number'
+                                min={0}
+                                max={100}
+                                step='0.01'
+                                {...field}
+                                onChange={(event) =>
+                                  field.onChange(event.target.valueAsNumber)
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
                 </SideDrawerSection>
               )}
 

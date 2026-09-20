@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,64 +10,134 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel"
 	openaichannel "github.com/QuantumNous/new-api/relay/channel/openai"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
 )
 
+func globalSystemPromptForGroup(group string) string {
+	if setting.IsGroupExemptFromSystemPrompt(group) {
+		return ""
+	}
+	return strings.TrimSpace(model.GetGlobalSystemPromptAppend())
+}
+
 func applySystemPromptIfNeeded(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeneralOpenAIRequest) {
 	if info == nil || request == nil {
 		return
 	}
-	if info.ChannelSetting.SystemPrompt == "" {
+
+	globalPrompt := globalSystemPromptForGroup(info.UsingGroup)
+	channelPrompt := strings.TrimSpace(info.ChannelSetting.SystemPrompt)
+	if globalPrompt == "" && channelPrompt == "" {
 		return
 	}
 
 	systemRole := request.GetSystemRoleName()
-
-	containSystemPrompt := false
-	for _, message := range request.Messages {
+	systemMessageIndex := -1
+	for i, message := range request.Messages {
 		if message.Role == systemRole {
-			containSystemPrompt = true
+			systemMessageIndex = i
 			break
 		}
 	}
-	if !containSystemPrompt {
+
+	prefixParts := make([]string, 0, 2)
+	if globalPrompt != "" {
+		prefixParts = append(prefixParts, globalPrompt)
+	}
+	if channelPrompt != "" && (systemMessageIndex == -1 || info.ChannelSetting.SystemPromptOverride) {
+		prefixParts = append(prefixParts, channelPrompt)
+	}
+	if len(prefixParts) == 0 {
+		return
+	}
+	prefixText := strings.Join(prefixParts, "\n")
+
+	if systemMessageIndex == -1 {
 		systemMessage := dto.Message{
 			Role:    systemRole,
-			Content: info.ChannelSetting.SystemPrompt,
+			Content: prefixText,
 		}
 		request.Messages = append([]dto.Message{systemMessage}, request.Messages...)
 		return
 	}
 
-	if !info.ChannelSetting.SystemPromptOverride {
+	common.SetContextKey(c, constant.ContextKeySystemPromptOverride, true)
+	message := &request.Messages[systemMessageIndex]
+	if message.IsStringContent() {
+		existing := message.StringContent()
+		if strings.TrimSpace(existing) == "" {
+			message.SetStringContent(prefixText)
+		} else {
+			message.SetStringContent(prefixText + "\n" + existing)
+		}
+		return
+	}
+	contents := message.ParseContent()
+	contents = append([]dto.MediaContent{{
+		Type: dto.ContentTypeText,
+		Text: prefixText,
+	}}, contents...)
+	message.Content = contents
+}
+
+func applySystemPromptToResponsesRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.OpenAIResponsesRequest) {
+	if info == nil || request == nil {
+		return
+	}
+
+	globalPrompt := globalSystemPromptForGroup(info.UsingGroup)
+	channelPrompt := strings.TrimSpace(info.ChannelSetting.SystemPrompt)
+	hasExisting := len(request.Instructions) > 0 && string(request.Instructions) != "null"
+
+	prefixParts := make([]string, 0, 2)
+	if globalPrompt != "" {
+		prefixParts = append(prefixParts, globalPrompt)
+	}
+	if channelPrompt != "" && (!hasExisting || info.ChannelSetting.SystemPromptOverride) {
+		prefixParts = append(prefixParts, channelPrompt)
+	}
+	if len(prefixParts) == 0 {
+		return
+	}
+	prefixText := strings.Join(prefixParts, "\n")
+
+	if !hasExisting {
+		if raw, err := common.Marshal(prefixText); err == nil {
+			request.Instructions = raw
+		}
 		return
 	}
 
 	common.SetContextKey(c, constant.ContextKeySystemPromptOverride, true)
-	for i, message := range request.Messages {
-		if message.Role != systemRole {
-			continue
+	var existingString string
+	if err := common.Unmarshal(request.Instructions, &existingString); err == nil {
+		raw, marshalErr := common.Marshal(prefixText + "\n" + existingString)
+		if marshalErr == nil {
+			request.Instructions = raw
 		}
-		if message.IsStringContent() {
-			request.Messages[i].SetStringContent(info.ChannelSetting.SystemPrompt + "\n" + message.StringContent())
-			return
-		}
-		contents := message.ParseContent()
-		contents = append([]dto.MediaContent{
-			{
-				Type: dto.ContentTypeText,
-				Text: info.ChannelSetting.SystemPrompt,
-			},
-		}, contents...)
-		request.Messages[i].Content = contents
 		return
+	}
+
+	var existingItems []json.RawMessage
+	if err := common.Unmarshal(request.Instructions, &existingItems); err != nil {
+		return
+	}
+	prefixItem, err := common.Marshal(prefixText)
+	if err != nil {
+		return
+	}
+	mergedItems := append([]json.RawMessage{prefixItem}, existingItems...)
+	if raw, marshalErr := common.Marshal(mergedItems); marshalErr == nil {
+		request.Instructions = raw
 	}
 }
 

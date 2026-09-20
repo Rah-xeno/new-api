@@ -20,14 +20,15 @@ type Token struct {
 	CreatedTime        int64          `json:"created_time" gorm:"bigint"`
 	AccessedTime       int64          `json:"accessed_time" gorm:"bigint"`
 	ExpiredTime        int64          `json:"expired_time" gorm:"bigint;default:-1"` // -1 means never expired
-	RemainQuota        int            `json:"remain_quota" gorm:"default:0"`
+	RemainQuota        int64          `json:"remain_quota" gorm:"default:0"`
 	UnlimitedQuota     bool           `json:"unlimited_quota"`
 	ModelLimitsEnabled bool           `json:"model_limits_enabled"`
 	ModelLimits        string         `json:"model_limits" gorm:"type:text"`
 	AllowIps           *string        `json:"allow_ips" gorm:"default:''"`
-	UsedQuota          int            `json:"used_quota" gorm:"default:0"` // used quota
+	UsedQuota          int64          `json:"used_quota" gorm:"default:0"` // used quota
 	Group              string         `json:"group" gorm:"default:''"`
-	CrossGroupRetry    bool           `json:"cross_group_retry"` // 跨分组重试，仅auto分组有效
+	BackupGroup        string         `json:"backup_group" gorm:"type:varchar(64);default:''"`
+	CrossGroupRetry    bool           `json:"cross_group_retry"` // Deprecated: retained for database compatibility.
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 
@@ -76,6 +77,43 @@ func (token *Token) GetIpLimits() []string {
 		}
 	}
 	return ipLimits
+}
+
+// GetFirstGroup supports legacy multi-group tokens while keeping the current
+// single-group behavior. Legacy multi-group values are JSON string arrays.
+func (token *Token) GetFirstGroup() string {
+	group := strings.TrimSpace(token.Group)
+	if !strings.HasPrefix(group, "[") {
+		return group
+	}
+
+	var groups []string
+	if err := common.UnmarshalJsonStr(group, &groups); err != nil {
+		return group
+	}
+	if len(groups) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(groups[0])
+}
+
+// GetBackupGroup prefers the dedicated backup group and falls back to the
+// second entry from legacy multi-group token data.
+func (token *Token) GetBackupGroup() string {
+	backupGroup := strings.TrimSpace(token.BackupGroup)
+	if backupGroup != "" {
+		return backupGroup
+	}
+
+	group := strings.TrimSpace(token.Group)
+	if !strings.HasPrefix(group, "[") {
+		return ""
+	}
+	var groups []string
+	if err := common.UnmarshalJsonStr(group, &groups); err != nil || len(groups) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(groups[1])
 }
 
 func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
@@ -302,7 +340,7 @@ func (token *Token) Update() (err error) {
 		}
 	}()
 	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry").Updates(token).Error
+		"model_limits_enabled", "model_limits", "allow_ips", "group", "backup_group").Updates(token).Error
 	return err
 }
 
@@ -379,26 +417,27 @@ func DeleteTokenById(id int, userId int) (err error) {
 	return token.Delete()
 }
 
-func IncreaseTokenQuota(tokenId int, key string, quota int) (err error) {
-	if quota < 0 {
+func IncreaseTokenQuota[T quotaValue](tokenId int, key string, quota T) (err error) {
+	quotaDelta := int64(quota)
+	if quotaDelta < 0 {
 		return errors.New("quota 不能为负数！")
 	}
 	if common.RedisEnabled {
 		gopool.Go(func() {
-			err := cacheIncrTokenQuota(key, int64(quota))
+			err := cacheIncrTokenQuota(key, quotaDelta)
 			if err != nil {
 				common.SysLog("failed to increase token quota: " + err.Error())
 			}
 		})
 	}
 	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, tokenId, quota)
+		addNewRecord(BatchUpdateTypeTokenQuota, tokenId, quotaDelta)
 		return nil
 	}
-	return increaseTokenQuota(tokenId, quota)
+	return increaseTokenQuota(tokenId, quotaDelta)
 }
 
-func increaseTokenQuota(id int, quota int) (err error) {
+func increaseTokenQuota(id int, quota int64) (err error) {
 	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
 		map[string]interface{}{
 			"remain_quota":  gorm.Expr("remain_quota + ?", quota),
@@ -409,26 +448,27 @@ func increaseTokenQuota(id int, quota int) (err error) {
 	return err
 }
 
-func DecreaseTokenQuota(id int, key string, quota int) (err error) {
-	if quota < 0 {
+func DecreaseTokenQuota[T quotaValue](id int, key string, quota T) (err error) {
+	quotaDelta := int64(quota)
+	if quotaDelta < 0 {
 		return errors.New("quota 不能为负数！")
 	}
 	if common.RedisEnabled {
 		gopool.Go(func() {
-			err := cacheDecrTokenQuota(key, int64(quota))
+			err := cacheDecrTokenQuota(key, quotaDelta)
 			if err != nil {
 				common.SysLog("failed to decrease token quota: " + err.Error())
 			}
 		})
 	}
 	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, id, -quota)
+		addNewRecord(BatchUpdateTypeTokenQuota, id, -quotaDelta)
 		return nil
 	}
-	return decreaseTokenQuota(id, quota)
+	return decreaseTokenQuota(id, quotaDelta)
 }
 
-func decreaseTokenQuota(id int, quota int) (err error) {
+func decreaseTokenQuota(id int, quota int64) (err error) {
 	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
 		map[string]interface{}{
 			"remain_quota":  gorm.Expr("remain_quota - ?", quota),

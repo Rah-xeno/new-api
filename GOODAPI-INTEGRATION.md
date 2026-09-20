@@ -2,7 +2,7 @@
 
 ## 交付范围
 
-以 `Rah-xeno/new-api` 的 main 源码快照为基础，迁入用户提供的
+最初以 `Rah-xeno/new-api` 的 main 源码快照为基础，现已整合 dev 分支的既有功能，迁入用户提供的
 `goodapinew-main.zip` 中的界面，接入位置为 `web/default`。
 
 - 首页：球体视频、静态海报、移动端导航、模型展示与页面过渡。
@@ -10,7 +10,7 @@
 - 控制台：顶栏、侧栏、表格、弹窗、配色、概览和余额用量卡片。
 - 模型价格页：模型卡片、分组筛选、搜索、表格模式、价格详情与性能展示。
 - 保留 new-api 的渠道、令牌、用户、钱包、订阅、日志及管理功能。
-- 保留 classic 主题供切换；新安装默认使用本次集成的新版主题。
+- 遵循 dev 分支仅运行 default 新版前端的设计，保留 dev 的代理分销、邀请计划、管理统计与资源加载恢复功能。
 
 这次是前端界面移植与接口适配，没有替换 new-api 的后端业务系统。
 GoodAPI 独有的 JWT 刷新令牌、安全验证、细粒度管理员权限、插件市场、
@@ -23,15 +23,13 @@ GoodAPI 独有的 JWT 刷新令牌、安全验证、细粒度管理员权限、�
 2. 移动端账号安全入口仍归入 new-api 的个人资料页。
 3. 性能卡片读取 new-api 的 `recent_success_rates` 数组；没有数据时保留空状态，不伪造时间戳或性能数据。
 4. 后台文档和导航继续使用站点配置，不强制跳转 GoodAPI 的文档站。
-5. 保留 workspace、Docker 双主题构建以及版权和许可证；首页同时显示上游归属。
+5. 保留 workspace、dev 的默认主题 Docker 构建以及版权和许可证；首页同时显示上游归属。
 6. 在前端 workspace 固定 `date-fns` 2.x 的根依赖，解决 classic 的 `date-fns-tz` 1.x 被错误提升到 4.x 的兼容问题。
 7. 修正导入概览页和宿主布局重复嵌套的问题，避免重复标题与内部滚动容器。
 
 ## 已有站点切换
 
-已有数据库如果保存了 `theme.frontend=classic`，仍会显示 classic。
-请在管理员的系统设置中找到「前端主题」，选择「默认（新版前端）」并保存，
-然后刷新页面。对应配置值是 `theme.frontend=default`。
+dev 分支已统一使用 default 新版前端，本次继续采用该行为。
 
 后台如果设置了自定义首页内容或首页 URL，会继续优先显示该内容。
 若要显示这次的球体首页，请清空自定义首页配置。
@@ -47,13 +45,11 @@ cd default
 bun run typecheck
 bun run test
 bun run build
-cd ../classic
-bun run build
 cd ../..
 go build -o new-api .
 ```
 
-源码包包含两个主题的已构建 `dist`，可直接构建 Go 程序。
+Git 仓库不跟踪构建产物；必须先构建 web/default/dist，再构建 Go 程序。此前交付的 ZIP 基于 main，不能替代整合了 dev 功能的当前分支。
 修改前端后必须重新构建前端，再重新构建 Go；静态资源被嵌入二进制。
 
 原 `docker-compose.yml` 使用上游公开镜像，不包含本次修改。
@@ -92,3 +88,7 @@ docker compose -f docker-compose.yml -f docker-compose.goodapi.yml up -d
 - 用户 ZIP SHA-256：`BD68793C53C12C74B19297B995425D773C50D2ADE365D398A1D1CFF2216B3A91`
 
 许可证和第三方声明见仓库原有的 LICENSE、NOTICE 和 THIRD-PARTY-LICENSES.md。
+
+## dev 合并说明
+
+保留 dev 原有的后端、邀请计划、代理分销、管理统计、注册接口、账号字段、资源加载恢复和新版专用构建。翻译按键合并；双方都修改的既有键优先保留 dev 业务文案，GoodAPI 新增界面键保留。验证结果以 PR 的最新合并说明为准。

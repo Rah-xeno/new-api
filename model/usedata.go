@@ -22,7 +22,7 @@ type QuotaData struct {
 	NodeName  string `json:"node_name" gorm:"index;size:64;default:''"`
 	TokenUsed int    `json:"token_used" gorm:"default:0"`
 	Count     int    `json:"count" gorm:"default:0"`
-	Quota     int    `json:"quota" gorm:"default:0"`
+	Quota     int64  `json:"quota" gorm:"default:0"`
 }
 
 type QuotaDataLogParams struct {
@@ -88,7 +88,7 @@ func LogQuotaData(params QuotaDataLogParams) {
 		ChannelID: params.ChannelID,
 		NodeName:  params.NodeName,
 		Count:     1,
-		Quota:     params.Quota,
+		Quota:     int64(params.Quota),
 		TokenUsed: params.TokenUsed,
 	}
 

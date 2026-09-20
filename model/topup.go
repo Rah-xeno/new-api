@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dev"
 	"github.com/QuantumNous/new-api/logger"
 
 	"github.com/shopspring/decimal"
@@ -111,7 +112,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		return errors.New("未提供支付单号")
 	}
 
-	var quota float64
+	var quota int64
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
@@ -140,11 +141,21 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 			return err
 		}
 
-		quota = topUp.Money * common.QuotaPerUnit
+		quota, err = common.QuotaFromDecimal64Strict(
+			decimal.NewFromFloat(topUp.Money).
+				Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+				Truncate(0),
+		)
+		if err != nil || quota <= 0 {
+			return errors.New("无效的充值额度")
+		}
 		err = tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(map[string]interface{}{"stripe_customer": customerId, "quota": gorm.Expr("quota + ?", quota)}).Error
 		if err != nil {
 			return err
 		}
+
+		// Invite reward
+		handleTopUpInviteReward(tx, topUp.UserId, topUp.TradeNo, quota)
 
 		return nil
 	})
@@ -154,7 +165,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		return errors.New("充值失败，请稍后重试")
 	}
 
-	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%d", logger.FormatQuota(int(quota)), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
+	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%d", logger.FormatQuota(quota), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
 
 	return nil
 }
@@ -328,7 +339,7 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	}
 
 	var userId int
-	var quotaToAdd int
+	var quotaToAdd int64
 	var payMoney float64
 	var paymentMethod string
 
@@ -351,13 +362,19 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		// 计算应充值额度：
 		// - Stripe 订单：Money 代表经分组倍率换算后的美元数量，直接 * QuotaPerUnit
 		// - 其他订单（如易支付）：Amount 为美元数量，* QuotaPerUnit
+		var quotaErr error
 		if topUp.PaymentProvider == PaymentProviderStripe {
 			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-			quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(dQuotaPerUnit).IntPart())
+			quotaToAdd, quotaErr = common.QuotaFromDecimal64Strict(
+				decimal.NewFromFloat(topUp.Money).Mul(dQuotaPerUnit).Truncate(0),
+			)
 		} else {
 			dAmount := decimal.NewFromInt(topUp.Amount)
 			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-			quotaToAdd = int(dAmount.Mul(dQuotaPerUnit).IntPart())
+			quotaToAdd, quotaErr = common.QuotaFromDecimal64Strict(dAmount.Mul(dQuotaPerUnit).Truncate(0))
+		}
+		if quotaErr != nil {
+			return quotaErr
 		}
 		if quotaToAdd <= 0 {
 			return errors.New("无效的充值额度")
@@ -374,6 +391,9 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
 			return err
 		}
+
+		// Invite reward
+		handleTopUpInviteReward(tx, topUp.UserId, topUp.TradeNo, quotaToAdd)
 
 		userId = topUp.UserId
 		payMoney = topUp.Money
@@ -451,6 +471,9 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			return err
 		}
 
+		// Invite reward
+		handleTopUpInviteReward(tx, topUp.UserId, topUp.TradeNo, quota)
+
 		return nil
 	})
 
@@ -469,7 +492,7 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 		return errors.New("未提供支付单号")
 	}
 
-	var quotaToAdd int
+	var quotaToAdd int64
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
@@ -497,7 +520,10 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 
 		dAmount := decimal.NewFromInt(topUp.Amount)
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-		quotaToAdd = int(dAmount.Mul(dQuotaPerUnit).IntPart())
+		quotaToAdd, err = common.QuotaFromDecimal64Strict(dAmount.Mul(dQuotaPerUnit).Truncate(0))
+		if err != nil {
+			return err
+		}
 		if quotaToAdd <= 0 {
 			return errors.New("无效的充值额度")
 		}
@@ -511,6 +537,9 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
 			return err
 		}
+
+		// Invite reward
+		handleTopUpInviteReward(tx, topUp.UserId, topUp.TradeNo, quotaToAdd)
 
 		return nil
 	})
@@ -532,7 +561,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 		return errors.New("未提供支付单号")
 	}
 
-	var quotaToAdd int
+	var quotaToAdd int64
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
@@ -558,7 +587,14 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 			return errors.New("充值订单状态错误")
 		}
 
-		quotaToAdd = int(decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		quotaToAdd, err = common.QuotaFromDecimal64Strict(
+			decimal.NewFromInt(topUp.Amount).
+				Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+				Truncate(0),
+		)
+		if err != nil {
+			return err
+		}
 		if quotaToAdd <= 0 {
 			return errors.New("无效的充值额度")
 		}
@@ -573,6 +609,9 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 			return err
 		}
 
+		// Invite reward
+		handleTopUpInviteReward(tx, topUp.UserId, topUp.TradeNo, quotaToAdd)
+
 		return nil
 	})
 
@@ -586,4 +625,42 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 	}
 
 	return nil
+}
+
+// handleTopUpInviteReward grants invite reward inside the topup DB transaction.
+// It locks the user row, reads inviter info, and calls the shared reward logic.
+// Non-fatal: errors are logged but do not roll back the topup.
+func handleTopUpInviteReward(tx *gorm.DB, userId int, tradeNo string, quotaToAdd int64) {
+	var user User
+	if err := lockForUpdate(tx).Select("id", "inviter_id", "username", "created_at", "referral_mode").Where("id = ?", userId).First(&user).Error; err != nil {
+		common.SysError("invite reward: failed to read user: " + err.Error())
+		return
+	}
+	if user.InviterId == 0 {
+		return
+	}
+	if NormalizeReferralMode(user.ReferralMode) == ReferralModeAgentDistribution {
+		var topUp TopUp
+		if err := tx.Where("trade_no = ?", tradeNo).First(&topUp).Error; err != nil {
+			common.SysError("agent commission: failed to read topup: " + err.Error())
+			return
+		}
+		if err := tx.Transaction(func(commissionTx *gorm.DB) error {
+			_, commissionErr := HandleAgentCommissionForTopUpTx(commissionTx, &topUp)
+			return commissionErr
+		}); err != nil {
+			common.SysError("agent commission for topup failed: " + err.Error())
+		}
+		return
+	}
+
+	if _, rewardErr := dev.HandleInviteRewardForPayment(
+		tx, userId, user.InviterId, user.Username, user.CreatedAt,
+		dev.InvitePlanTriggerTopup, tradeNo, quotaToAdd,
+		func(uid int, msg string) {
+			RecordLog(uid, LogTypeTopup, msg)
+		},
+	); rewardErr != nil {
+		common.SysError("invite reward for topup failed: " + rewardErr.Error())
+	}
 }

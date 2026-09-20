@@ -25,6 +25,7 @@ import { PaymentSettingsSection } from '../integrations/payment-settings-section
 import { RatioSettingsCard } from '../models/ratio-settings-card'
 import type { BillingSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
+import { AgentDistributionSettingsSection } from './agent-distribution-settings-section'
 
 const getModelDefaults = (settings: BillingSettings) => ({
   ModelPrice: settings.ModelPrice,
@@ -44,6 +45,7 @@ const getGroupDefaults = (settings: BillingSettings) => ({
   TopupGroupRatio: settings.TopupGroupRatio,
   GroupRatio: settings.GroupRatio,
   UserUsableGroups: settings.UserUsableGroups,
+  SystemPromptExemptGroups: settings.SystemPromptExemptGroups,
   GroupGroupRatio: settings.GroupGroupRatio,
   AutoGroups: settings.AutoGroups,
   DefaultUseAutoGroup: settings.DefaultUseAutoGroup,
@@ -196,6 +198,20 @@ const BILLING_SECTIONS = [
           enabled: settings['checkin_setting.enabled'],
           minQuota: settings['checkin_setting.min_quota'],
           maxQuota: settings['checkin_setting.max_quota'],
+        }}
+      />
+    ),
+  },
+  {
+    id: 'agent-distribution',
+    titleKey: 'Agent Distribution',
+    build: (settings: BillingSettings) => (
+      <AgentDistributionSettingsSection
+        defaultValues={{
+          firstRate:
+            settings['agent_distribution_setting.default_first_topup_rate'],
+          repeatRate:
+            settings['agent_distribution_setting.default_repeat_topup_rate'],
         }}
       />
     ),

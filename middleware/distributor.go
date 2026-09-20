@@ -136,6 +136,7 @@ func Distribute() func(c *gin.Context) {
 						Ctx:         c,
 						ModelName:   modelRequest.Model,
 						TokenGroup:  usingGroup,
+						BackupGroup: common.GetContextKeyString(c, constant.ContextKeyTokenBackupGroup),
 						RequestPath: c.Request.URL.Path,
 						Retry:       common.GetPointer(0),
 					})

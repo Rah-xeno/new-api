@@ -6,6 +6,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,8 +58,8 @@ func TestUserUpdateDoesNotOverwriteAccountingFields(t *testing.T) {
 	var got User
 	require.NoError(t, DB.First(&got, user.Id).Error)
 	assert.Equal(t, "after", got.DisplayName)
-	assert.Equal(t, 600, got.Quota)
-	assert.Equal(t, 420, got.UsedQuota)
+	assert.Equal(t, int64(600), got.Quota)
+	assert.Equal(t, int64(420), got.UsedQuota)
 	assert.Equal(t, 4, got.RequestCount)
 }
 
@@ -86,8 +87,8 @@ func TestUpdateUserSettingOnlyUpdatesSetting(t *testing.T) {
 
 	var got User
 	require.NoError(t, DB.First(&got, user.Id).Error)
-	assert.Equal(t, 750, got.Quota)
-	assert.Equal(t, 270, got.UsedQuota)
+	assert.Equal(t, int64(750), got.Quota)
+	assert.Equal(t, int64(270), got.UsedQuota)
 	assert.Equal(t, 4, got.RequestCount)
 	assert.Equal(t, "zh", got.GetSetting().Language)
 }
@@ -151,6 +152,75 @@ func TestInsertKeepsBlankPasswordForPasswordlessUser(t *testing.T) {
 	var stored User
 	require.NoError(t, DB.Where("username = ?", user.Username).First(&stored).Error)
 	assert.Empty(t, stored.Password)
+}
+
+func TestSearchUsersFindsRegistrationIP(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	users := []User{
+		{Username: "matching-ip", Password: "password", AffCode: "ip01", RegistrationIP: "203.0.113.7"},
+		{Username: "other-ip", Password: "password", AffCode: "ip02", RegistrationIP: "198.51.100.9"},
+	}
+	require.NoError(t, DB.Create(&users).Error)
+
+	matched, total, err := SearchUsers("203.0.113.7", "", nil, nil, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, matched, 1)
+	assert.Equal(t, int64(1), total)
+	assert.Equal(t, "matching-ip", matched[0].Username)
+	assert.Equal(t, "203.0.113.7", matched[0].RegistrationIP)
+}
+
+func TestInsertCountsInviteWhenLegacyInviterRewardIsDisabled(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	paymentSetting := operation_setting.GetPaymentSetting()
+	originalComplianceConfirmed := paymentSetting.ComplianceConfirmed
+	originalComplianceTermsVersion := paymentSetting.ComplianceTermsVersion
+	originalQuotaForNewUser := common.QuotaForNewUser
+	originalQuotaForInvitee := common.QuotaForInvitee
+	originalQuotaForInviter := common.QuotaForInviter
+	t.Cleanup(func() {
+		paymentSetting.ComplianceConfirmed = originalComplianceConfirmed
+		paymentSetting.ComplianceTermsVersion = originalComplianceTermsVersion
+		common.QuotaForNewUser = originalQuotaForNewUser
+		common.QuotaForInvitee = originalQuotaForInvitee
+		common.QuotaForInviter = originalQuotaForInviter
+	})
+
+	paymentSetting.ComplianceConfirmed = true
+	paymentSetting.ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
+	common.QuotaForNewUser = 0
+	common.QuotaForInvitee = 0
+	common.QuotaForInviter = 0
+
+	inviter := User{
+		Username:        "invite-count-inviter",
+		Password:        "password",
+		Status:          common.UserStatusEnabled,
+		AffCount:        2,
+		AffQuota:        100,
+		AffHistoryQuota: 200,
+	}
+	require.NoError(t, DB.Create(&inviter).Error)
+
+	invitee := &User{
+		Username: "invite-count-invitee",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+	}
+	require.NoError(t, invitee.Insert(inviter.Id))
+
+	var storedInviter User
+	require.NoError(t, DB.First(&storedInviter, inviter.Id).Error)
+	assert.Equal(t, 3, storedInviter.AffCount)
+	assert.Equal(t, int64(100), storedInviter.AffQuota)
+	assert.Equal(t, int64(200), storedInviter.AffHistoryQuota)
+
+	var storedInvitee User
+	require.NoError(t, DB.First(&storedInvitee, invitee.Id).Error)
+	assert.Equal(t, inviter.Id, storedInvitee.InviterId)
+	assert.Equal(t, ReferralModeInvite, storedInvitee.ReferralMode)
 }
 
 func TestValidateAndFillRejectsPasswordlessUser(t *testing.T) {

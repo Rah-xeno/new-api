@@ -195,6 +195,7 @@ export function ModelMutateDrawer({
       TopupGroupRatio: '',
       GroupRatio: '',
       UserUsableGroups: '',
+      SystemPromptExemptGroups: '{}',
       GroupGroupRatio: '',
       AutoGroups: '',
       DefaultUseAutoGroup: false,

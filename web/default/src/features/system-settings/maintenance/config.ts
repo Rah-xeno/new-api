@@ -70,11 +70,13 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
   personal: {
     enabled: true,
     topup: true,
+    agentDistribution: true,
     personal: true,
   },
   admin: {
     enabled: true,
     channel: true,
+    analytics: true,
     models: true,
     redemption: true,
     user: true,

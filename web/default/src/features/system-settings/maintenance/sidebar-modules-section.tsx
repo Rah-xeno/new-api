@@ -124,6 +124,10 @@ export function SidebarModulesSection({
         title: t('Wallet'),
         description: t('Top up balance and view billing history.'),
       },
+      agentDistribution: {
+        title: t('Agent Distribution'),
+        description: t('Agent customer and commission portal.'),
+      },
       personal: {
         title: t('Profile'),
         description: t('Personal settings and profile management.'),
@@ -133,6 +137,10 @@ export function SidebarModulesSection({
       channel: {
         title: t('Channels'),
         description: t('Configure upstream providers and routing.'),
+      },
+      analytics: {
+        title: t('Data analytics'),
+        description: t('Review global usage, reliability and revenue trends.'),
       },
       models: {
         title: t('Models'),

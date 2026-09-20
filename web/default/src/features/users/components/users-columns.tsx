@@ -161,6 +161,22 @@ export function useUsersColumns(): ColumnDef<User>[] {
       meta: { mobileBadge: true },
     },
     {
+      accessorKey: 'registration_ip',
+      header: t('Registration IP'),
+      cell: ({ row }) => {
+        const registrationIp = row.getValue('registration_ip') as
+          | string
+          | undefined
+        return (
+          <LongText className='text-muted-foreground max-w-[180px] font-mono text-xs'>
+            {registrationIp || '-'}
+          </LongText>
+        )
+      },
+      size: 180,
+      meta: { mobileHidden: true },
+    },
+    {
       id: 'quota',
       accessorKey: 'quota',
       header: t('Quota'),

@@ -66,7 +66,7 @@ func SetApiRouter(router *gin.Engine) {
 
 		userRoute := apiRouter.Group("/user")
 		{
-			userRoute.POST("/register", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, middleware.TurnstileCheck(), controller.Register)
+			userRoute.POST("/enroll", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, middleware.TurnstileCheck(), controller.Register)
 			userRoute.POST("/login", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, middleware.TurnstileCheck(), controller.Login)
 			userRoute.POST("/login/2fa", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, controller.Verify2FALogin)
 			userRoute.POST("/passkey/login/begin", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, controller.PasskeyLoginBegin)
@@ -108,6 +108,14 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/aff_transfer", controller.TransferAffQuota)
 				selfRoute.PUT("/setting", controller.UpdateUserSetting)
 
+				// Invite
+				selfRoute.GET("/invite/dashboard", controller.GetSelfInviteDashboard)
+				selfRoute.GET("/invite/logs", controller.GetSelfInviteLogs)
+				selfRoute.GET("/agent/dashboard", controller.GetSelfAgentDashboard)
+				selfRoute.GET("/agent/insights", controller.GetSelfAgentInsights)
+				selfRoute.GET("/agent/records", controller.GetSelfAgentRecords)
+				selfRoute.GET("/agent/topups", controller.GetSelfAgentTopUps)
+
 				// 2FA routes
 				selfRoute.GET("/2fa/status", controller.Get2FAStatus)
 				selfRoute.POST("/2fa/setup", controller.Setup2FA)
@@ -134,6 +142,7 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/:id/oauth/bindings", controller.GetUserOAuthBindingsByAdmin)
 				adminRoute.DELETE("/:id/oauth/bindings/:provider_id", controller.UnbindCustomOAuthByAdmin)
 				adminRoute.DELETE("/:id/bindings/:binding_type", controller.AdminClearUserBinding)
+				adminRoute.POST("/:id/agent-withdraw", controller.AdminWithdrawAgentCommission)
 				adminRoute.GET("/:id", controller.GetUser)
 				adminRoute.POST("/", controller.CreateUser)
 				adminRoute.POST("/manage", controller.ManageUser)
@@ -299,6 +308,12 @@ func SetApiRouter(router *gin.Engine) {
 		dataRoute.GET("/flow", middleware.AdminAuth(), controller.GetAllFlowQuotaDates)
 		dataRoute.GET("/flow/self", middleware.UserAuth(), controller.GetUserFlowQuotaDates)
 
+		analyticsRoute := apiRouter.Group("/analytics/admin")
+		analyticsRoute.Use(middleware.AdminAuth())
+		{
+			analyticsRoute.GET("/report", controller.GetAdminAnalyticsReport)
+		}
+
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
 		{
 			logRoute.GET("/token", middleware.TokenAuthReadOnly(), controller.GetLogByKey)
@@ -378,5 +393,17 @@ func SetApiRouter(router *gin.Engine) {
 			deploymentsRoute.POST("/:id/extend", controller.ExtendDeployment)
 			deploymentsRoute.DELETE("/:id", controller.DeleteDeployment)
 		}
+	}
+
+	// Dev: Invite Plans (admin only)
+	invitePlanRoute := apiRouter.Group("/invite-plan/admin")
+	invitePlanRoute.Use(middleware.AdminAuth())
+	{
+		invitePlanRoute.GET("/plans", controller.GetInvitePlans)
+		invitePlanRoute.POST("/plans", controller.CreateInvitePlan)
+		invitePlanRoute.PUT("/plans/:id", controller.UpdateInvitePlan)
+		invitePlanRoute.PATCH("/plans/:id", controller.UpdateInvitePlan)
+		invitePlanRoute.DELETE("/plans/:id", controller.DeleteInvitePlan)
+		invitePlanRoute.GET("/reward-records", controller.GetInviteRewardRecords)
 	}
 }
