@@ -3893,6 +3893,7 @@
     "Password must contain between 8 and 128 characters.": "密码长度必须为 8–128 个字符。",
     "Password Registration": "密码注册",
     "Password reset and copied to clipboard: {{password}}": "密码已重置并复制到剪贴板：{{password}}",
+    "Password reset request received. If this email is linked to an account, check your inbox and spam folder for reset instructions.": "密码重置请求已提交。如果该邮箱已绑定账号，请检查收件箱和垃圾邮件文件夹中的重置说明。",
     "Password reset: {{password}}": "密码已重置：{{password}}",
     "Password set successfully": "密码设置成功",
     "Password settings have changed. Reload the page and try again.": "密码设置已变化，请刷新页面后重试。",

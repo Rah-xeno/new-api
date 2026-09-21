@@ -3893,6 +3893,7 @@
     "Password must contain between 8 and 128 characters.": "Password must contain between 8 and 128 characters.",
     "Password Registration": "Password Registration",
     "Password reset and copied to clipboard: {{password}}": "Password reset and copied to clipboard: {{password}}",
+    "Password reset request received. If this email is linked to an account, check your inbox and spam folder for reset instructions.": "Password reset request received. If this email is linked to an account, check your inbox and spam folder for reset instructions.",
     "Password reset: {{password}}": "Password reset: {{password}}",
     "Password set successfully": "Password set successfully",
     "Password settings have changed. Reload the page and try again.": "Password settings have changed. Reload the page and try again.",

@@ -3817,6 +3817,7 @@
     "Password must contain between 8 and 128 characters.": "パスワードは8～128文字で入力してください。",
     "Password Registration": "パスワード登録",
     "Password reset and copied to clipboard: {{password}}": "パスワードがリセットされ、クリップボードにコピーされました：{{password}}",
+    "Password reset request received. If this email is linked to an account, check your inbox and spam folder for reset instructions.": "パスワード再設定のリクエストを受け付けました。このメールアドレスがアカウントに登録されている場合は、受信トレイと迷惑メールフォルダーで再設定の案内をご確認ください。",
     "Password reset: {{password}}": "パスワードがリセットされました：{{password}}",
     "Password set successfully": "パスワードを設定しました",
     "Password settings have changed. Reload the page and try again.": "パスワード設定が変わりました。ページを再読み込みしてお試しください。",

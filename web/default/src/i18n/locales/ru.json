@@ -3817,6 +3817,7 @@
     "Password must contain between 8 and 128 characters.": "Пароль должен содержать от 8 до 128 символов.",
     "Password Registration": "Регистрация пароля",
     "Password reset and copied to clipboard: {{password}}": "Пароль сброшен и скопирован в буфер обмена: {{password}}",
+    "Password reset request received. If this email is linked to an account, check your inbox and spam folder for reset instructions.": "Запрос на сброс пароля получен. Если этот адрес связан с аккаунтом, проверьте входящие и папку «Спам» — там могут быть инструкции по сбросу.",
     "Password reset: {{password}}": "Пароль сброшен: {{password}}",
     "Password set successfully": "Пароль установлен",
     "Password settings have changed. Reload the page and try again.": "Настройки пароля изменились. Перезагрузите страницу и повторите попытку.",

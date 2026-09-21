@@ -3817,6 +3817,7 @@
     "Password must contain between 8 and 128 characters.": "Mật khẩu phải có từ 8 đến 128 ký tự.",
     "Password Registration": "Đăng ký mật khẩu",
     "Password reset and copied to clipboard: {{password}}": "Mật khẩu đã đặt lại và sao chép vào clipboard: {{password}}",
+    "Password reset request received. If this email is linked to an account, check your inbox and spam folder for reset instructions.": "Đã nhận yêu cầu đặt lại mật khẩu. Nếu email này được liên kết với một tài khoản, hãy kiểm tra hộp thư đến và thư mục thư rác để tìm hướng dẫn đặt lại mật khẩu.",
     "Password reset: {{password}}": "Mật khẩu đã đặt lại: {{password}}",
     "Password set successfully": "Đã đặt mật khẩu thành công",
     "Password settings have changed. Reload the page and try again.": "Cài đặt mật khẩu đã thay đổi. Tải lại trang và thử lại.",

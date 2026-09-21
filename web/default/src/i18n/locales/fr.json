@@ -3817,6 +3817,7 @@
     "Password must contain between 8 and 128 characters.": "Le mot de passe doit contenir entre 8 et 128 caractères.",
     "Password Registration": "Inscription par mot de passe",
     "Password reset and copied to clipboard: {{password}}": "Mot de passe réinitialisé et copié dans le presse-papiers : {{password}}",
+    "Password reset request received. If this email is linked to an account, check your inbox and spam folder for reset instructions.": "Demande de réinitialisation du mot de passe reçue. Si cette adresse est liée à un compte, consultez votre boîte de réception et vos courriers indésirables pour les instructions.",
     "Password reset: {{password}}": "Mot de passe réinitialisé : {{password}}",
     "Password set successfully": "Mot de passe défini",
     "Password settings have changed. Reload the page and try again.": "Les paramètres du mot de passe ont changé. Rechargez la page et réessayez.",
