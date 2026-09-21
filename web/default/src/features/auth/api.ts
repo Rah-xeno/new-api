@@ -71,6 +71,7 @@ export async function sendPasswordResetEmail(
 ): Promise<ApiResponse> {
   const res = await api.get('/api/reset_password', {
     params: { email, turnstile },
+    skipBusinessError: true,
   })
   return res.data
 }
