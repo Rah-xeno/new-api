@@ -19,6 +19,9 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  'Invitation code is required',
+  'Invitation code must be at most 32 characters',
+  'Bound inviter {{inviter_id}} to user {{username}} (ID: {{id}})',
   // Header navigation
   'Home',
   'Console',

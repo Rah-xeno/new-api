@@ -27,7 +27,7 @@ import { quotaUnitsToDollars } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
 
 import { DEFAULT_GROUP } from '../constants'
-import { type UserFormData, type User } from '../types'
+import type { UserFormData, User } from '../types'
 
 // ============================================================================
 // Form Schema
@@ -51,6 +51,16 @@ export const userFormSchema = z.object({
 })
 
 export type UserFormValues = z.infer<typeof userFormSchema>
+
+export const userInviterFormSchema = z.object({
+  aff_code: z
+    .string()
+    .trim()
+    .min(1, 'Invitation code is required')
+    .max(32, 'Invitation code must be at most 32 characters'),
+})
+
+export type UserInviterFormValues = z.infer<typeof userInviterFormSchema>
 
 // ============================================================================
 // Form Defaults
