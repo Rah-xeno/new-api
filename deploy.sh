@@ -22,5 +22,5 @@ echo "2. 执行构建脚本 sh build.sh"
 sh build.sh
 
 echo "3. 重启1Panel编排项目 newapi2"
-w
+docker restart "newapi2"
 echo "===== 部署完成 $(date) ====="
