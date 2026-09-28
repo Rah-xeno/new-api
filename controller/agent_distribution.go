@@ -110,6 +110,18 @@ func GetSelfAgentInsights(c *gin.Context) {
 	common.ApiSuccess(c, insights)
 }
 
+func AdminGetAgentDistributionOverview(c *gin.Context) {
+	pageInfo := common.GetPageQuery(c)
+	items, total, err := model.GetAgentDistributionOverview(pageInfo, strings.TrimSpace(c.Query("keyword")))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(items)
+	common.ApiSuccess(c, pageInfo)
+}
+
 type adminAgentWithdrawRequest struct {
 	Amount float64 `json:"amount"`
 	Remark string  `json:"remark"`

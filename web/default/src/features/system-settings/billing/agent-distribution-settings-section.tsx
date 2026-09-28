@@ -17,10 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
+import { StaticDataTable } from '@/components/data-table/static/static-data-table'
+import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
@@ -31,11 +35,39 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { api } from '@/lib/api'
 
 import { SettingsForm } from '../components/settings-form-layout'
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
+
+type AgentOverviewItem = {
+  agent_id: number
+  username: string
+  display_name: string
+  email: string
+  aff_code: string
+  invitee_total: number
+  paid_invitee_total: number
+  total_topup_amount: number
+  commission_total: number
+  commission_balance: number
+  commission_withdrawn: number
+}
+
+type PagedData<T> = {
+  page: number
+  page_size: number
+  total: number
+  items: T[]
+}
+
+const PAGE_SIZE = 10
+
+function formatMoney(cents: number | undefined) {
+  return `¥${((cents ?? 0) / 100).toFixed(2)}`
+}
 
 const schema = z.object({
   firstRate: z.number().min(0).max(100),
@@ -140,6 +172,119 @@ export function AgentDistributionSettingsSection(props: {
           </div>
         </SettingsForm>
       </Form>
+
+      <AgentOverviewList />
     </SettingsSection>
+  )
+}
+
+function AgentOverviewList() {
+  const { t } = useTranslation()
+  const [page, setPage] = useState(1)
+
+  const query = useQuery({
+    queryKey: ['agent-distribution', 'admin', 'overview', page],
+    queryFn: async () => {
+      const response = await api.get<{ success: boolean; data: PagedData<AgentOverviewItem> }>(
+        '/api/agent-distribution/admin/overview',
+        { params: { p: page, page_size: PAGE_SIZE } }
+      )
+      return response.data.data
+    },
+  })
+
+  const data = query.data
+  const totalPages = useMemo(
+    () => (data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1),
+    [data]
+  )
+
+  const columns = useMemo(
+    () => [
+      {
+        id: 'agent',
+        header: t('Agent'),
+        cell: (row: AgentOverviewItem) =>
+          row.display_name || row.username || row.email || `#${row.agent_id}`,
+      },
+      {
+        id: 'aff_code',
+        header: t('Affiliate code'),
+        cell: (row: AgentOverviewItem) => row.aff_code || '-',
+      },
+      {
+        id: 'invitee_total',
+        header: t('Invited customers'),
+        cell: (row: AgentOverviewItem) => row.invitee_total,
+      },
+      {
+        id: 'paid_invitee_total',
+        header: t('Paid customers'),
+        cell: (row: AgentOverviewItem) => row.paid_invitee_total,
+      },
+      {
+        id: 'total_topup_amount',
+        header: t('Total top-up'),
+        cell: (row: AgentOverviewItem) => formatMoney(row.total_topup_amount),
+      },
+      {
+        id: 'commission_total',
+        header: t('Total commission'),
+        cell: (row: AgentOverviewItem) => formatMoney(row.commission_total),
+      },
+      {
+        id: 'commission_balance',
+        header: t('Withdrawable balance'),
+        cell: (row: AgentOverviewItem) => formatMoney(row.commission_balance),
+      },
+      {
+        id: 'commission_withdrawn',
+        header: t('Withdrawn'),
+        cell: (row: AgentOverviewItem) => formatMoney(row.commission_withdrawn),
+      },
+    ],
+    [t]
+  )
+
+  return (
+    <div className='flex flex-col gap-3'>
+      <div className='flex items-center justify-between'>
+        <h3 className='text-sm font-medium'>{t('Agent overview')}</h3>
+      </div>
+      <StaticDataTable
+        columns={columns}
+        data={data?.items ?? []}
+        getRowKey={(row) => row.agent_id}
+        empty={!data || data.items.length === 0}
+        emptyContent={
+          <div className='py-8 text-center text-sm text-muted-foreground'>
+            {query.isLoading ? t('Loading...') : t('No agents yet')}
+          </div>
+        }
+      />
+      {totalPages > 1 && (
+        <div className='flex items-center justify-end gap-2'>
+          <Button
+            variant='outline'
+            size='sm'
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            {t('Previous')}
+          </Button>
+          <span className='text-sm text-muted-foreground'>
+            {page} / {totalPages}
+          </span>
+          <Button
+            variant='outline'
+            size='sm'
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            {t('Next')}
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }

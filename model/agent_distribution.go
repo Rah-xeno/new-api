@@ -405,6 +405,71 @@ func agentInviteesQuery(agentId int, keyword string) *gorm.DB {
 	return query
 }
 
+// AgentDistributionOverviewItem summarizes a single agent for the admin
+// overview list: how many customers they recruited and how much commission
+// they have earned/withdrawn.
+type AgentDistributionOverviewItem struct {
+	AgentId            int    `json:"agent_id"`
+	Username           string `json:"username"`
+	DisplayName        string `json:"display_name"`
+	Email              string `json:"email"`
+	AffCode            string `json:"aff_code"`
+	InviteeTotal       int64  `json:"invitee_total"`
+	PaidInviteeTotal   int64  `json:"paid_invitee_total"`
+	TotalTopupAmount   int64  `json:"total_topup_amount"`
+	CommissionTotal    int64  `json:"commission_total"`
+	CommissionBalance  int64  `json:"commission_balance"`
+	CommissionWithdrawn int64 `json:"commission_withdrawn"`
+}
+
+// GetAgentDistributionOverview returns a page of users who are visible in the
+// agent portal (enabled or with any commission history), each annotated with
+// their downstream customer counts and commission aggregates.
+func GetAgentDistributionOverview(pageInfo *common.PageInfo, keyword string) ([]AgentDistributionOverviewItem, int64, error) {
+	query := DB.Model(&User{}).Where("agent_enabled = ? OR agent_commission_balance > 0 OR agent_commission_total > 0 OR agent_commission_withdrawn > 0", true)
+	if value := strings.TrimSpace(strings.ToLower(keyword)); value != "" {
+		like := "%" + value + "%"
+		query = query.Where("LOWER(username) LIKE ? OR LOWER(display_name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(aff_code) LIKE ?", like, like, like, like)
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	agents := make([]User, 0)
+	if err := query.Order("id DESC").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Find(&agents).Error; err != nil {
+		return nil, 0, err
+	}
+	items := make([]AgentDistributionOverviewItem, 0, len(agents))
+	for _, agent := range agents {
+		item := AgentDistributionOverviewItem{
+			AgentId:             agent.Id,
+			Username:            agent.Username,
+			DisplayName:         buildAgentInviteeDisplayName(&agent),
+			Email:               agent.Email,
+			AffCode:             strings.TrimSpace(agent.AffCode),
+			CommissionTotal:     agent.AgentCommissionTotal,
+			CommissionBalance:   agent.AgentCommissionBalance,
+			CommissionWithdrawn: agent.AgentCommissionWithdrawn,
+		}
+		inviteesQuery := DB.Model(&User{}).Where("inviter_id = ? AND referral_mode = ?", agent.Id, ReferralModeAgentDistribution)
+		inviteesQuery.Count(&item.InviteeTotal)
+		type aggregate struct {
+			Amount float64 `gorm:"column:amount"`
+			Users  int64   `gorm:"column:users"`
+		}
+		var row aggregate
+		if err := DB.Model(&TopUp{}).Joins("JOIN users ON users.id = top_ups.user_id").
+			Where("users.inviter_id = ? AND users.referral_mode = ? AND top_ups.status = ?", agent.Id, ReferralModeAgentDistribution, common.TopUpStatusSuccess).
+			Select("COALESCE(SUM(top_ups.money), 0) AS amount, COUNT(DISTINCT top_ups.user_id) AS users").Scan(&row).Error; err != nil {
+			return nil, 0, err
+		}
+		item.TotalTopupAmount = yuanAmountToCents(row.Amount)
+		item.PaidInviteeTotal = row.Users
+		items = append(items, item)
+	}
+	return items, total, nil
+}
+
 func GetAgentDashboardStats(agentId int) (*AgentDashboardStats, error) {
 	stats := &AgentDashboardStats{}
 	if err := agentInviteesQuery(agentId, "").Count(&stats.InviteeTotal).Error; err != nil {

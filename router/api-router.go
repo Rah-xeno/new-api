@@ -407,4 +407,11 @@ func SetApiRouter(router *gin.Engine) {
 		invitePlanRoute.DELETE("/plans/:id", controller.DeleteInvitePlan)
 		invitePlanRoute.GET("/reward-records", controller.GetInviteRewardRecords)
 	}
+
+	// Dev: Agent distribution overview (admin only)
+	agentDistributionAdminRoute := apiRouter.Group("/agent-distribution/admin")
+	agentDistributionAdminRoute.Use(middleware.AdminAuth())
+	{
+		agentDistributionAdminRoute.GET("/overview", controller.AdminGetAgentDistributionOverview)
+	}
 }
