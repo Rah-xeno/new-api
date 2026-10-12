@@ -481,13 +481,13 @@ export function RechargeFormCard({
               )}
             </span>
             <a
-              href='https://wzyp.cn/shop/XISCRAJ7'
+              href='https://yuzhideep.com/shop/SYMT7XEH6'
               target='_blank'
               rel='noopener noreferrer'
               className='inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground shrink-0'
             >
               <SiAlipay className='h-4 w-4' style={{ color: '#1677FF' }} />
-              {t('链动小铺')}
+              {t('小豆集市')}
             </a>
           </AlertDescription>
         </Alert>
