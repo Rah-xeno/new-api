@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Plus, Trash2 } from 'lucide-react'
+import { Download, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -24,7 +24,7 @@ import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 
-import { deleteInvalidRedemptions } from '../api'
+import { deleteInvalidRedemptions, exportRedemptions } from '../api'
 import { ERROR_MESSAGES } from '../constants'
 import { useRedemptions } from './redemptions-provider'
 
@@ -34,6 +34,7 @@ export function RedemptionsPrimaryButtons() {
   const [showDeleteInvalidConfirm, setShowDeleteInvalidConfirm] =
     useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   const handleDeleteInvalid = async () => {
     setIsDeleting(true)
@@ -56,9 +57,40 @@ export function RedemptionsPrimaryButtons() {
     }
   }
 
+  const handleExport = async () => {
+    setIsExporting(true)
+    try {
+      const csvText = await exportRedemptions()
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+      a.download = `redemption_codes_${timestamp}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success(t('Redemption codes exported successfully'))
+    } catch {
+      toast.error(t(ERROR_MESSAGES.EXPORT_FAILED))
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <>
       <div className='flex flex-wrap gap-2'>
+        <Button
+          size='sm'
+          variant='outline'
+          onClick={handleExport}
+          disabled={isExporting}
+        >
+          <Download className='h-4 w-4' />
+          {t('Export')}
+        </Button>
         <Button
           size='sm'
           variant='outline'

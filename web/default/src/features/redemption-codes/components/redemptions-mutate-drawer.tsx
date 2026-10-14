@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Download } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -72,6 +73,25 @@ type RedemptionsMutateDrawerProps = {
   currentRow?: Redemption
 }
 
+// Build a txt file (same format as the "copy selected" bulk action:
+// `name\tcode` one per line) and trigger a download.
+function downloadRedemptionCodes(name: string, keys: string[]) {
+  const content = keys.map((key) => `${name}\t${key}`).join('\n')
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  const timestamp = new Date()
+    .toISOString()
+    .slice(0, 19)
+    .replace(/[:T]/g, '-')
+  a.download = `redemption_codes_${timestamp}.txt`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 export function RedemptionsMutateDrawer({
   open,
   onOpenChange,
@@ -102,7 +122,10 @@ export function RedemptionsMutateDrawer({
     }
   }, [open, isUpdate, currentRow, form])
 
-  const onSubmit = async (data: RedemptionFormValues) => {
+  const onSubmit = async (
+    data: RedemptionFormValues,
+    exportAfterCreate = false
+  ) => {
     setIsSubmitting(true)
     try {
       const basePayload = transformFormDataToPayload(data)
@@ -121,7 +144,8 @@ export function RedemptionsMutateDrawer({
         // Create mode
         const result = await createRedemption(basePayload)
         if (result.success) {
-          const count = result.data?.length || 0
+          const keys = result.data || []
+          const count = keys.length
           toast.success(
             count > 1
               ? t('Successfully created {{count}} redemption codes', {
@@ -129,6 +153,9 @@ export function RedemptionsMutateDrawer({
                 })
               : t(SUCCESS_MESSAGES.REDEMPTION_CREATED)
           )
+          if (exportAfterCreate && count > 0) {
+            downloadRedemptionCodes(data.name, keys)
+          }
           onOpenChange(false)
           triggerRefresh()
         }
@@ -147,7 +174,18 @@ export function RedemptionsMutateDrawer({
       }
     }
 
-    void form.handleSubmit(onSubmit)(event)
+    void form.handleSubmit((data) => onSubmit(data, false))(event)
+  }
+
+  const handleCreateAndExport = () => {
+    if (isUpdate) return
+    const data = form.getValues()
+    // Ensure a default name is set before validation, mirroring handleSubmit
+    if (!data.name?.trim()) {
+      const quota = parseQuotaFromDollars(data.quota_dollars)
+      form.setValue('name', formatQuota(quota), { shouldValidate: true })
+    }
+    void form.handleSubmit((values) => onSubmit(values, true))()
   }
 
   const handleSetExpiry = (months: number, days: number, hours: number) => {
@@ -333,6 +371,16 @@ export function RedemptionsMutateDrawer({
           <SheetClose render={<Button variant='outline' />}>
             {t('Close')}
           </SheetClose>
+          {!isUpdate && (
+            <Button
+              variant='outline'
+              onClick={handleCreateAndExport}
+              disabled={isSubmitting}
+            >
+              <Download className='h-4 w-4' />
+              {isSubmitting ? t('Saving...') : t('Create & Export')}
+            </Button>
+          )}
           <Button form='redemption-form' type='submit' disabled={isSubmitting}>
             {isSubmitting ? t('Saving...') : t('Save changes')}
           </Button>

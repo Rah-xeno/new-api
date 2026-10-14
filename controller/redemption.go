@@ -1,8 +1,11 @@
 package controller
 
 import (
+	"encoding/csv"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
@@ -190,6 +193,57 @@ func DeleteInvalidRedemption(c *gin.Context) {
 		"data":    rows,
 	})
 	return
+}
+
+func ExportRedemptions(c *gin.Context) {
+	redemptions, err := model.GetAllRedemptionsForExport()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	filename := fmt.Sprintf("redemption_codes_%s.csv", time.Now().Format("20060102_150405"))
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	// Prepend UTF-8 BOM so Excel opens the CSV with correct encoding
+	c.Writer.WriteString("\xEF\xBB\xBF")
+
+	writer := csv.NewWriter(c.Writer)
+	if err := writer.Write([]string{"ID", "Name", "Code", "Quota", "Status", "Created Time", "Expired Time", "Redeemed By", "Redeemed Time"}); err != nil {
+		return
+	}
+
+	for _, r := range redemptions {
+		status := "Enabled"
+		switch r.Status {
+		case common.RedemptionCodeStatusDisabled:
+			status = "Disabled"
+		case common.RedemptionCodeStatusUsed:
+			status = "Used"
+		}
+		record := []string{
+			strconv.Itoa(r.Id),
+			r.Name,
+			r.Key,
+			strconv.FormatInt(r.Quota, 10),
+			status,
+			formatExportTime(r.CreatedTime),
+			formatExportTime(r.ExpiredTime),
+			strconv.Itoa(r.UsedUserId),
+			formatExportTime(r.RedeemedTime),
+		}
+		if err := writer.Write(record); err != nil {
+			return
+		}
+	}
+	writer.Flush()
+}
+
+func formatExportTime(ts int64) string {
+	if ts == 0 {
+		return ""
+	}
+	return time.Unix(ts, 0).Format("2006-01-02 15:04:05")
 }
 
 func validateExpiredTime(c *gin.Context, expired int64) (bool, string) {

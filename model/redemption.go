@@ -127,6 +127,11 @@ func SearchRedemptions(keyword string, status string, startIdx int, num int) (re
 	return redemptions, total, nil
 }
 
+func GetAllRedemptionsForExport() (redemptions []*Redemption, err error) {
+	err = DB.Order("id desc").Find(&redemptions).Error
+	return redemptions, err
+}
+
 func GetRedemptionById(id int) (*Redemption, error) {
 	if id == 0 {
 		return nil, errors.New("id 为空！")

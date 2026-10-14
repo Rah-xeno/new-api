@@ -98,3 +98,11 @@ export async function deleteInvalidRedemptions(): Promise<ApiResponse<number>> {
   const res = await api.delete('/api/redemption/invalid')
   return res.data
 }
+
+// Export all redemption codes as CSV text
+export async function exportRedemptions(): Promise<string> {
+  const res = await api.get('/api/redemption/export', {
+    responseType: 'text',
+  })
+  return res.data
+}
