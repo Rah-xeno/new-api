@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Gift, ExternalLink, Loader2, Receipt, WalletCards } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SiAlipay } from 'react-icons/si'
+import { SiWechat } from 'react-icons/si'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -481,12 +481,21 @@ export function RechargeFormCard({
               )}
             </span>
             <a
+              href='https://wzyp.cn/shop/XISCRAJ7'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground shrink-0'
+            >
+              <SiWechat className='h-4 w-4' style={{ color: '#07C160' }} />
+              {t('链动小铺')}
+            </a>
+            <a
               href='https://yuzhideep.com/shop/SYMT7XEH6'
               target='_blank'
               rel='noopener noreferrer'
               className='inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground shrink-0'
             >
-              <SiAlipay className='h-4 w-4' style={{ color: '#1677FF' }} />
+              <SiWechat className='h-4 w-4' style={{ color: '#07C160' }} />
               {t('小豆集市')}
             </a>
           </AlertDescription>
